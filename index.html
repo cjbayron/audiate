@@ -5,18 +5,28 @@
     <title>Pianotize</title>
     <!-- <link rel="stylesheet" href="style.css"> -->
 
-    <!-- Magenta -->
+    <!-- P5 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js"></script>
+
+    <!-- Tone -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.52/Tone.js"></script>
+
+    <!-- Magenta (for wav-to-notes transciption) -->
     <script src="https://cdn.jsdelivr.net/npm/@magenta/music@1.2"></script>
+
+    <!-- Tonal (for building musical scales) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tonaljs/tonal/browser/tonal.min.js"></script>
+
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <div align="center">
+    <div align="center" hidden="true">
     <br>
     <button id="rec">
       REC
     </button>
 
-    <!-- test -->
+    <!-- audio test -->
     <br>
     <input id="audio_file" type="file" accept="audio/*" />
     <br>
