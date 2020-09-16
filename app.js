@@ -39,20 +39,42 @@ if (keyname.length > 1) { // accidentals
 
 // construct scale
 let scaleName = keyname.concat(' major')
-let notes = Tonal.Scale.get(scaleName).notes;
-notes = notes.map(note => note + '4'); // add position in piano
-notes.push(keyname + '5'); // add final note
-notes = notes.concat(notes.slice().reverse()) // add scale-down
+let scaleNotes = Tonal.Scale.get(scaleName).notes;
+scaleNotes = scaleNotes.map(note => note + '4'); // add position in piano
+scaleNotes.push(keyname + '5'); // add final note
+let upDownNotes = scaleNotes.concat(scaleNotes.slice().reverse()) // add scale-down
 
-console.log(notes)
+// console.log(notes)
 
 // play scale up-down
 let now = Tone.now()
-notes.forEach((note) => {
-	//noteStr = note.concat('4')
-	synth.triggerAttackRelease(note, '8n', now);
+upDownNotes.forEach((note) => {
+	synth.triggerAttackRelease(note, '8n', now); // async
 	now += 0.3 // interval (in seconds) between notes
 });
+
+
+//console.log(Math.random() )
+//console.log(Math.random())
+
+function playRandomReference(scaleNotes, k) {
+	// pick k notes from the scale
+	let noteIxs = []
+	for (i=0; i<k; i++) {
+		noteIxs.push(Math.floor(Math.random() * scaleNotes.length))
+	}
+
+	console.log(noteIxs);
+
+	now += 0.5
+	noteIxs.forEach((ix) => {
+		synth.triggerAttackRelease(scaleNotes[ix], '8n', now);
+		now += 0.5
+	});
+}
+
+playRandomReference(scaleNotes, 5);
+
 
 function preload() {
 	titlefont = loadFont('assets/SourceSansPro-SemiboldIt.otf');
