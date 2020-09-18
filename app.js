@@ -15,47 +15,9 @@ const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
 let synth;
 
 
-// bonus replace default sampler
+// bonus: replace default sampler
 
 
-// TBD: implement note randomizer (for now limit to a picked major scale)
-// https://github.com/cjbayron/ga-workshop-p5-tone/blob/master/part-3-p5-tone/ball-bounce/sketch.js
-// let synth; 
-// const AMinorScale = ['A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4'];
-// // choose a random note from the scale
-// randomNote = int(random(0, AMinorScale.length));
-// // console.log(randomNote);
-
-// // play the random note
-// synth.triggerAttackRelease(AMinorScale[randomNote], '16n'); 
-
-synth = new Tone.Synth().toDestination();
-
-// sample code to get notes
-let keyname = keys[1];
-if (keyname.length > 1) { // accidentals
-	keyname = keyname.substring(0, 2)
-}
-
-// construct scale
-let scaleName = keyname.concat(' major')
-let scaleNotes = Tonal.Scale.get(scaleName).notes;
-scaleNotes = scaleNotes.map(note => note + '4'); // add position in piano
-scaleNotes.push(keyname + '5'); // add final note
-let upDownNotes = scaleNotes.concat(scaleNotes.slice().reverse()) // add scale-down
-
-// console.log(notes)
-
-// play scale up-down
-let now = Tone.now()
-upDownNotes.forEach((note) => {
-	synth.triggerAttackRelease(note, '8n', now); // async
-	now += 0.3 // interval (in seconds) between notes
-});
-
-
-//console.log(Math.random() )
-//console.log(Math.random())
 
 function playRandomReference(scaleNotes, k) {
 	// pick k notes from the scale
@@ -73,9 +35,9 @@ function playRandomReference(scaleNotes, k) {
 	});
 }
 
-playRandomReference(scaleNotes, 5);
+//playRandomReference(scaleNotes, 5);
 
-
+// P5 functions
 function preload() {
 	titlefont = loadFont('assets/SourceSansPro-SemiboldIt.otf');
 	font = loadFont('assets/SourceSansPro-Regular.otf');
@@ -83,20 +45,22 @@ function preload() {
 
 function setup() {
 	createCanvas(windowWidth, windowHeight);
+	synth = new Tone.Synth().toDestination();
 
 	scaleSelect = createSelect(keys);
 	scaleSelect.position(30, 200)
-	scaleSelect.option('Pick scale (major)...')
 	keys.forEach((scale) => {
 		scaleSelect.option(scale);
 	});
-	scaleSelect.style('color', '#261b0a')
-	scaleSelect.style('background-color', '#e3b196')
+	// scaleSelect.style('color', '#261b0a')
+	// scaleSelect.style('background-color', '#e3b196')
 
 	startButton = createButton('START')
 	startButton.position(30, 250)
-	startButton.style('color', '#261b0a')
-	startButton.style('background-color', '#e3b196')
+	//startButton.style('color', '#261b0a')
+	//startButton.style('background-color', '#e3b196')
+	startButton.attribute('class', 'button');
+	startButton.mouseReleased(startGame);
 }
 
 function draw() {
@@ -114,6 +78,48 @@ function draw() {
 	// textSize(fontSize);
 	// textAlign(CENTER)
 	// text('Scale (major): ', width * 0.45, height * 0.215)
+}
+
+// handlers
+function startGame() {
+
+	startButton.attribute('disabled', true)
+
+	let keyname = scaleSelect.value();
+	if (keyname.length > 1) { // accidentals
+		keyname = keyname.substring(0, 2)
+	}
+
+	// construct scale
+	let scaleName = keyname.concat(' major')
+	let scaleNotes = Tonal.Scale.get(scaleName).notes;
+
+	// add position in piano
+	let pos = '4'
+	scaleNotes[0] += pos
+	for (i = 1; i < scaleNotes.length; i++) {
+		let note = Tonal.Note.simplify(scaleNotes[i]);
+		if (note.charAt(0) == 'C') {
+			pos = '5'
+		}
+		scaleNotes[i] = note + pos
+	}
+	scaleNotes.push(keyname + '5'); // add final note
+
+	// add scale-down
+	let upDownNotes = scaleNotes.concat(scaleNotes.slice().reverse())
+	// play scale up-down
+	let now = Tone.now()
+	let st = now
+	upDownNotes.forEach((note) => {
+		synth.triggerAttackRelease(note, '8n', now); // async
+		now += 0.3 // interval (in seconds) between notes
+	});
+
+	// wait for synth to finish playing
+	setTimeout(() => {
+		startButton.removeAttribute('disabled');
+	}, (0.3+now-st)*1000);
 }
 
 rec.addEventListener('click', () => {
