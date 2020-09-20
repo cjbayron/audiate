@@ -4,38 +4,28 @@ let titlefont;
 let font;
 let scaleSelect;
 let startButton;
-
 const titleSize = 50;
 const fontSize = 20;
+const states = {
+	IDLE: 'idle',
+	PREP: 'prep',
+	PLAY: 'play',
+	READY: 'ready'
+}
+let state = states.IDLE;
+let timer = 0;
+let timerInterval;
 
 // keys array
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
 						  'F#/G♭', 'G', 'G#/A♭', 'A', 'A#/B♭', 'B']
+let scaleNotes;
 
 let synth;
 
 
 // bonus: replace default sampler
 
-
-
-function playRandomReference(scaleNotes, k) {
-	// pick k notes from the scale
-	let noteIxs = []
-	for (i=0; i<k; i++) {
-		noteIxs.push(Math.floor(Math.random() * scaleNotes.length))
-	}
-
-	console.log(noteIxs);
-
-	now += 0.5
-	noteIxs.forEach((ix) => {
-		synth.triggerAttackRelease(scaleNotes[ix], '8n', now);
-		now += 0.5
-	});
-}
-
-//playRandomReference(scaleNotes, 5);
 
 // P5 functions
 function preload() {
@@ -78,12 +68,44 @@ function draw() {
 	// textSize(fontSize);
 	// textAlign(CENTER)
 	// text('Scale (major): ', width * 0.45, height * 0.215)
+
+	switch(state) {
+		case states.IDLE:
+			// display nothing
+			break;
+		case states.PREP:
+			fill('#e3b196');
+			textFont(font);
+			textSize(fontSize);
+			textAlign(LEFT)
+			text('Listen carefully to the scale.', 30, 350)
+			if (timer > 0) {
+				text('Reference notes will play in '+timer+'...', 30, 350+fontSize)
+			}
+			break;
+		case states.READY: // state to trigger play
+			playRound();
+			break;
+		case states.PLAY:
+			fill('#e3b196');
+			textFont(font);
+			textSize(fontSize);
+			textAlign(LEFT)
+			text('Listen carefully to the reference notes.', 30, 350)
+			text('Repeat the notes in your piano after hearing the chord.', 30, 350+fontSize)
+			if (timer > 0) {
+				text('Next notes will play in '+timer+'...', 30, 350+(fontSize*2))
+			}
+			break;
+	}
 }
 
 // handlers
 function startGame() {
 
 	startButton.attribute('disabled', true)
+	startButton.html('STOP')
+	state = states.PREP;
 
 	let keyname = scaleSelect.value();
 	if (keyname.length > 1) { // accidentals
@@ -92,7 +114,7 @@ function startGame() {
 
 	// construct scale
 	let scaleName = keyname.concat(' major')
-	let scaleNotes = Tonal.Scale.get(scaleName).notes;
+	scaleNotes = Tonal.Scale.get(scaleName).notes;
 
 	// add position in piano
 	let pos = '4'
@@ -106,9 +128,8 @@ function startGame() {
 	}
 	scaleNotes.push(keyname + '5'); // add final note
 
-	// add scale-down
+	// play scale notes up-down
 	let upDownNotes = scaleNotes.concat(scaleNotes.slice().reverse())
-	// play scale up-down
 	let now = Tone.now()
 	let st = now
 	upDownNotes.forEach((note) => {
@@ -119,7 +140,69 @@ function startGame() {
 	// wait for synth to finish playing
 	setTimeout(() => {
 		startButton.removeAttribute('disabled');
+		startButton.mouseReleased(stopGame);
+
+		timer = 3
+		timerInterval = setInterval(() => {
+			timer -= 1
+			if (timer == 0) {
+				state = states.READY;
+				clearInterval(timerInterval);
+			}
+		}, 1000);
+
 	}, (0.3+now-st)*1000);
+}
+
+function stopGame() {
+	startButton.mouseReleased(startGame);
+	startButton.html('START')
+	state = states.IDLE;
+
+	// reset
+	clearInterval(timerInterval);
+	timer = 0
+}
+
+function playRound() {
+	// play a single round
+	state = states.PLAY;
+	startButton.attribute('disabled', true)
+
+	let playTime = playRandomReference(scaleNotes, 5);
+
+	setTimeout(() => {
+		startButton.removeAttribute('disabled');
+
+		timer = 3
+		timerInterval = setInterval(() => {
+			timer -= 1
+			if (timer == 0) {
+				state = states.READY;
+				clearInterval(timerInterval);
+			}
+		}, 1000);
+
+	}, (0.3+playTime)*1000);
+}
+
+function playRandomReference(notes, k) {
+	// pick k notes to play
+	let noteIxs = []
+	for (i=0; i<k; i++) {
+		noteIxs.push(Math.floor(Math.random() * notes.length))
+	}
+
+	//console.log(noteIxs);
+
+	let now = Tone.now()
+	let st = now
+	noteIxs.forEach((ix) => {
+		synth.triggerAttackRelease(notes[ix], '8n', now);
+		now += 0.5
+	});
+
+	return (now - st) // wait time
 }
 
 rec.addEventListener('click', () => {
