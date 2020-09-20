@@ -10,22 +10,21 @@ const states = {
 	IDLE: 'idle',
 	PREP: 'prep',
 	PLAY: 'play',
-	READY: 'ready'
+	READY: 'ready',
+	RECORD: 'record',
+	PROCESS: 'process'
 }
 let state = states.IDLE;
 let timer = 0;
 let timerInterval;
 
-// keys array
+// music variables
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
 						  'F#/G♭', 'G', 'G#/A♭', 'A', 'A#/B♭', 'B']
 let scaleNotes;
-
 let synth;
 
-
 // bonus: replace default sampler
-
 
 // P5 functions
 function preload() {
@@ -35,7 +34,7 @@ function preload() {
 
 function setup() {
 	createCanvas(windowWidth, windowHeight);
-	synth = new Tone.Synth().toDestination();
+	synth = new Tone.PolySynth(Tone.Synth).toDestination();
 
 	scaleSelect = createSelect(keys);
 	scaleSelect.position(30, 200)
@@ -171,6 +170,10 @@ function playRound() {
 
 	let playTime = playRandomReference(scaleNotes, 5);
 
+	// setTimeout(() => {
+	// 	record()
+	// }, (0.3+playTime)*1000);
+
 	setTimeout(() => {
 		startButton.removeAttribute('disabled');
 
@@ -202,12 +205,17 @@ function playRandomReference(notes, k) {
 		now += 0.5
 	});
 
+	// TBD: add some percussion here
+	// play major chord (or some signal)
+	// now += 0.5
+	// let majorFirst = [notes[0], notes[2], notes[4]]
+	// synth.triggerAttackRelease(majorFirst, '8n', now);
+
 	return (now - st) // wait time
 }
 
-rec.addEventListener('click', () => {
-
-	rec.disabled = true;
+function record() {
+	state = states.RECORD;
 
 	// record audio
 	// source: https://medium.com/@bryanjenningz/how-to-record-and-play-audio-in-javascript-faa1b2b3e49b
@@ -229,10 +237,10 @@ rec.addEventListener('click', () => {
 
   	setTimeout(() => {
   		mediaRecorder.stop();
-			rec.disabled = false;
+  		state = states.PROCESS
 		}, 3000);
 	});
-});
+}
 
 
 // load Onsets and Frames model from Magenta
