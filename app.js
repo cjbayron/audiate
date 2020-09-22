@@ -17,12 +17,17 @@ const states = {
 let state = states.IDLE;
 let timer = 0;
 let timerInterval;
+let numNotes = 5;
+let noteInterval = 0.5
+let noteGuide = 0;
+let guideInterval;
 
 // music variables
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
 						  'F#/G♭', 'G', 'G#/A♭', 'A', 'A#/B♭', 'B']
 let scaleNotes;
 let synth;
+let sigPlayer;
 
 // bonus: replace default sampler
 
@@ -35,6 +40,8 @@ function preload() {
 function setup() {
 	createCanvas(windowWidth, windowHeight);
 	synth = new Tone.PolySynth(Tone.Synth).toDestination();
+	sigPlayer = new Tone.Player('assets/signal.wav').toDestination();
+	sigPlayer.volume.value = -12;
 
 	scaleSelect = createSelect(keys);
 	scaleSelect.position(30, 200)
@@ -50,6 +57,11 @@ function setup() {
 	//startButton.style('background-color', '#e3b196')
 	startButton.attribute('class', 'button');
 	startButton.mouseReleased(startGame);
+
+	// trigger microphone permission request
+	navigator.mediaDevices.getUserMedia({ audio: true })
+		.then(() => {})
+    .catch((err) => {});
 }
 
 function draw() {
@@ -91,9 +103,29 @@ function draw() {
 			textSize(fontSize);
 			textAlign(LEFT)
 			text('Listen carefully to the reference notes.', 30, 350)
-			text('Repeat the notes in your piano after hearing the chord.', 30, 350+fontSize)
+			text('Repeat the notes in your piano after hearing the click sound.', 30, 350+fontSize)
 			if (timer > 0) {
 				text('Next notes will play in '+timer+'...', 30, 350+(fontSize*2))
+			}
+			break;
+		case states.RECORD:
+			fill('#e3b196');
+			textFont(font);
+			textSize(fontSize);
+			textAlign(LEFT)
+			text('Recording...', 30, 350)
+			if (noteGuide > 0) {
+				text('*'.repeat(noteGuide), 30, 350+fontSize)
+			}
+			break;
+		case states.PROCESS:
+			fill('#e3b196');
+			textFont(font);
+			textSize(fontSize);
+			textAlign(LEFT)
+			text('Done processing.', 30, 350)
+			if (timer > 0) {
+				text('Next notes will play in '+timer+'...', 30, 350+fontSize)
 			}
 			break;
 	}
@@ -168,25 +200,25 @@ function playRound() {
 	state = states.PLAY;
 	startButton.attribute('disabled', true)
 
-	let playTime = playRandomReference(scaleNotes, 5);
-
-	// setTimeout(() => {
-	// 	record()
-	// }, (0.3+playTime)*1000);
+	let playTime = playRandomReference(scaleNotes, numNotes);
 
 	setTimeout(() => {
-		startButton.removeAttribute('disabled');
+		record(playTime, numNotes)
+	}, playTime*1000);
 
-		timer = 3
-		timerInterval = setInterval(() => {
-			timer -= 1
-			if (timer == 0) {
-				state = states.READY;
-				clearInterval(timerInterval);
-			}
-		}, 1000);
+	// setTimeout(() => {
+	// 	startButton.removeAttribute('disabled');
 
-	}, (0.3+playTime)*1000);
+	// 	timer = 3
+	// 	timerInterval = setInterval(() => {
+	// 		timer -= 1
+	// 		if (timer == 0) {
+	// 			state = states.READY;
+	// 			clearInterval(timerInterval);
+	// 		}
+	// 	}, 1000);
+
+	// }, (0.3+playTime)*1000);
 }
 
 function playRandomReference(notes, k) {
@@ -202,19 +234,20 @@ function playRandomReference(notes, k) {
 	let st = now
 	noteIxs.forEach((ix) => {
 		synth.triggerAttackRelease(notes[ix], '8n', now);
-		now += 0.5
+		now += noteInterval
 	});
 
-	// TBD: add some percussion here
-	// play major chord (or some signal)
-	// now += 0.5
-	// let majorFirst = [notes[0], notes[2], notes[4]]
-	// synth.triggerAttackRelease(majorFirst, '8n', now);
+	// play signal sound
+	now += 0.5
+	sigPlayer.start(now)
+	now += 0.8
+	sigPlayer.stop(now)
 
 	return (now - st) // wait time
 }
 
-function record() {
+function record(length_s, numNotes) {
+	// length_s: record length in seconds
 	state = states.RECORD;
 
 	// record audio
@@ -235,11 +268,37 @@ function record() {
       audio.play();
     });
 
+		guideInterval = setInterval(() => {
+			noteGuide += 1
+			if (noteGuide == numNotes) {
+				clearInterval(guideInterval);
+			}
+		}, noteInterval*1000);
+
   	setTimeout(() => {
   		mediaRecorder.stop();
-  		state = states.PROCESS
-		}, 3000);
+			noteGuide = 0
+  		process()
+		}, length_s*1000);
 	});
+}
+
+function process() {
+	state = states.PROCESS;
+
+	// temp
+	setTimeout(() => {
+		startButton.removeAttribute('disabled');
+
+		timer = 3
+		timerInterval = setInterval(() => {
+			timer -= 1
+			if (timer == 0) {
+				state = states.READY;
+				clearInterval(timerInterval);
+			}
+		}, 1000);
+	}, 1000);
 }
 
 
