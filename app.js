@@ -74,58 +74,50 @@ function draw() {
 	textAlign(LEFT)
 	text('Pianotize', 20, 80)
 
-	// fill('#e3b196');
-	// textFont(font);
-	// textSize(fontSize);
-	// textAlign(CENTER)
-	// text('Scale (major): ', width * 0.45, height * 0.215)
+	var initText = function() {
+		fill('#e3b196');
+		textFont(font);
+		textSize(fontSize);
+		textAlign(LEFT);
+	}
 
 	switch(state) {
 		case states.IDLE:
+			initText();
+			text('To use this app, allow access to microphone.', 30, 350)
+			text('\nFor better experience, set your browser to always remember this decision.', 30, 350)
 			// display nothing
 			break;
 		case states.PREP:
-			fill('#e3b196');
-			textFont(font);
-			textSize(fontSize);
-			textAlign(LEFT)
+			initText();
 			text('Listen carefully to the scale.', 30, 350)
 			if (timer > 0) {
-				text('Reference notes will play in '+timer+'...', 30, 350+fontSize)
+				text('\nReference notes will play in '+timer+'...', 30, 350)
 			}
 			break;
 		case states.READY: // state to trigger play
 			playRound();
 			break;
 		case states.PLAY:
-			fill('#e3b196');
-			textFont(font);
-			textSize(fontSize);
-			textAlign(LEFT)
+			initText();
 			text('Listen carefully to the reference notes.', 30, 350)
-			text('Repeat the notes in your piano after hearing the click sound.', 30, 350+fontSize)
+			text('\nRepeat the notes in your piano after hearing the click sound.', 30, 350)
 			if (timer > 0) {
-				text('Next notes will play in '+timer+'...', 30, 350+(fontSize*2))
+				text('\n\nNext notes will play in '+timer+'...', 30, 350)
 			}
 			break;
 		case states.RECORD:
-			fill('#e3b196');
-			textFont(font);
-			textSize(fontSize);
-			textAlign(LEFT)
+			initText();
 			text('Recording...', 30, 350)
 			if (noteGuide > 0) {
-				text('*'.repeat(noteGuide), 30, 350+fontSize)
+				text('\n' + '*'.repeat(noteGuide), 30, 350)
 			}
 			break;
 		case states.PROCESS:
-			fill('#e3b196');
-			textFont(font);
-			textSize(fontSize);
-			textAlign(LEFT)
+			initText();
 			text('Done processing.', 30, 350)
 			if (timer > 0) {
-				text('Next notes will play in '+timer+'...', 30, 350+fontSize)
+				text('\nNext notes will play in '+timer+'...', 30, 350)
 			}
 			break;
 	}
@@ -250,37 +242,44 @@ function record(length_s, numNotes) {
 	// length_s: record length in seconds
 	state = states.RECORD;
 
+	// set timeout for record
+
 	// record audio
 	// source: https://medium.com/@bryanjenningz/how-to-record-and-play-audio-in-javascript-faa1b2b3e49b
-	navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-  	const mediaRecorder = new MediaRecorder(stream);
-  	mediaRecorder.start();
+	navigator.mediaDevices.getUserMedia({ audio: true })
+		.then(stream => {
+	  	const mediaRecorder = new MediaRecorder(stream);
+	  	mediaRecorder.start();
 
-  	const audioChunks = [];
-    mediaRecorder.addEventListener("dataavailable", event => {
-      audioChunks.push(event.data);
-    });
+	  	const audioChunks = [];
+	    mediaRecorder.addEventListener("dataavailable", event => {
+	      audioChunks.push(event.data);
+	    });
 
-    mediaRecorder.addEventListener("stop", () => {
-      const audioBlob = new Blob(audioChunks);
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.play();
-    });
+	    mediaRecorder.addEventListener("stop", () => {
+	      const audioBlob = new Blob(audioChunks);
+	      const audioUrl = URL.createObjectURL(audioBlob);
+	      const audio = new Audio(audioUrl);
+	      audio.play();
+	    });
 
-		guideInterval = setInterval(() => {
-			noteGuide += 1
-			if (noteGuide == numNotes) {
-				clearInterval(guideInterval);
-			}
-		}, noteInterval*1000);
+			guideInterval = setInterval(() => {
+				noteGuide += 1
+				if (noteGuide == numNotes) {
+					clearInterval(guideInterval);
+				}
+			}, noteInterval*1000);
 
-  	setTimeout(() => {
-  		mediaRecorder.stop();
-			noteGuide = 0
-  		process()
-		}, length_s*1000);
-	});
+	  	setTimeout(() => {
+	  		mediaRecorder.stop();
+				noteGuide = 0
+	  		process()
+			}, length_s*1000);
+		})
+		.catch((err) => {
+
+		});
+
 }
 
 function process() {
