@@ -36,6 +36,9 @@ let modelLoaded;
 // score tracker
 let roundTotal;
 
+// DEBUG: data collector
+let rows = [];
+
 
 // P5 functions
 function preload() {
@@ -214,6 +217,16 @@ function stopGame() {
 	// reset
 	clearInterval(timerInterval);
 	timer = 0
+
+	// DEBUG
+	if (rows.length > 0) {
+		// save to CSV
+		let csvContent = "data:text/csv;charset=utf-8," 
+    								 + rows.map(e => e.join(",")).join("\n");
+    
+    var encodedUri = encodeURI(csvContent);
+		window.open(encodedUri);
+	}
 }
 
 function playRound() {
@@ -221,57 +234,51 @@ function playRound() {
 	state = states.PLAY;
 	startButton.attribute('disabled', true)
 
-	let playTime = playRandomReference(scaleNotes, numNotes);
+	let ref = playRandomReference(scaleNotes, numNotes);
 
 	setTimeout(() => {
-		record(playTime, numNotes)
-	}, playTime*1000);
-
-	// setTimeout(() => {
-	// 	startButton.removeAttribute('disabled');
-
-	// 	timer = 3
-	// 	timerInterval = setInterval(() => {
-	// 		timer -= 1
-	// 		if (timer == 0) {
-	// 			state = states.READY;
-	// 			clearInterval(timerInterval);
-	// 		}
-	// 	}, 1000);
-
-	// }, (0.3+playTime)*1000);
+		record(ref, numNotes)
+	}, (ref.playTime + ref.playBuffer)*1000);
 }
 
 function playRandomReference(notes, k) {
 	// pick k notes to play
-	let noteIxs = []
+	let refNotes = [];
+	let midiNotes = [];
+	let ix;
 	for (i=0; i<k; i++) {
-		noteIxs.push(Math.floor(Math.random() * notes.length))
+		ix = Math.floor(Math.random() * notes.length)
+		refNotes.push(notes[ix])
+		midiNotes.push(Tonal.Note.midi(notes[ix]))
 	}
 
-	//console.log(noteIxs);
+	//console.log(refNotes);
 
 	let now = Tone.now()
 	let st = now
-	noteIxs.forEach((ix) => {
-		synth.triggerAttackRelease(notes[ix], '8n', now);
+	refNotes.forEach((note) => {
+		synth.triggerAttackRelease(note, '8n', now);
 		now += noteInterval
 	});
 
 	// play signal sound
-	now += 0.5
-	sigPlayer.start(now)
-	now += 0.8
-	sigPlayer.stop(now)
+	let buffer = 0.5
+	sigPlayer.start(now+buffer)
+	buffer += 0.8
+	sigPlayer.stop(now+buffer)
 
-	return (now - st) // wait time
+	return {
+		midiNotes: midiNotes,
+		playTime: (now - st),
+		playBuffer: buffer
+	}
 }
 
-function record(length_s, numNotes) {
-	// length_s: record length in seconds
+function record(ref, numNotes) {
 	state = states.RECORD;
-
-	// set timeout for record
+	// length_s: record length in seconds
+	let refNotes = ref.midiNotes;
+	let length_s = ref.playTime + 0.3; // add'l average reflex delay
 
 	// record audio
 	// source: https://medium.com/@bryanjenningz/how-to-record-and-play-audio-in-javascript-faa1b2b3e49b
@@ -290,7 +297,7 @@ function record(length_s, numNotes) {
 	      const audioUrl = URL.createObjectURL(audioBlob);
 	      //const audio = new Audio(audioUrl);
 	      //audio.play();
-	      process(audioUrl);
+	      process(refNotes, audioUrl);
 	    });
 
 			guideInterval = setInterval(() => {
@@ -311,13 +318,19 @@ function record(length_s, numNotes) {
 		});
 }
 
-function process(audioUrl) {
+function process(refNotes, audioUrl) {
 	state = states.PROCESS;
 	roundTotal += 1
 
 	// transcribe audio
 	transcriber.transcribeFromAudioURL(audioUrl).then((ns) => {
-		console.log(ns);
+		console.log(ns.notes);
+		console.log(refNotes);
+
+		// DEBUG
+		let row = ["'"+JSON.stringify(ns.notes)+"'", 
+							 "'"+JSON.stringify(refNotes)+"'"]
+		rows.push(row)
 
 		state = states.DONE;
 		startButton.removeAttribute('disabled');
