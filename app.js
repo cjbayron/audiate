@@ -7,14 +7,16 @@ let startButton;
 const titleSize = 50;
 const fontSize = 20;
 const states = {
+	LOADING: 'load',
 	IDLE: 'idle',
 	PREP: 'prep',
 	PLAY: 'play',
 	READY: 'ready',
 	RECORD: 'record',
-	PROCESS: 'process'
+	PROCESS: 'process',
+	DONE: 'done'
 }
-let state = states.IDLE;
+let state = states.LOADING;
 let timer = 0;
 let timerInterval;
 let numNotes = 5;
@@ -28,8 +30,12 @@ const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
 let scaleNotes;
 let synth;
 let sigPlayer;
+let transcriber;
+let modelLoaded;
 
-// bonus: replace default sampler
+// score tracker
+let roundTotal;
+
 
 // P5 functions
 function preload() {
@@ -42,6 +48,7 @@ function setup() {
 	synth = new Tone.PolySynth(Tone.Synth).toDestination();
 	sigPlayer = new Tone.Player('assets/signal.wav').toDestination();
 	sigPlayer.volume.value = -12;
+	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
 
 	scaleSelect = createSelect(keys);
 	scaleSelect.position(30, 200)
@@ -57,11 +64,18 @@ function setup() {
 	//startButton.style('background-color', '#e3b196')
 	startButton.attribute('class', 'button');
 	startButton.mouseReleased(startGame);
+	startButton.attribute('disabled', true) // disable until model is loaded
 
 	// trigger microphone permission request
 	navigator.mediaDevices.getUserMedia({ audio: true })
 		.then(() => {})
     .catch((err) => {});
+
+  modelLoaded = transcriber.initialize()
+  modelLoaded.then(() => {
+  	state = states.IDLE;
+  	startButton.removeAttribute('disabled');
+  });
 }
 
 function draw() {
@@ -82,11 +96,17 @@ function draw() {
 	}
 
 	switch(state) {
+		case states.LOADING:
+			initText();
+			text('Loading piano transcriber model...', 30, 350)
+			break;
 		case states.IDLE:
 			initText();
 			text('To use this app, allow access to microphone.', 30, 350)
 			text('\nFor better experience, set your browser to always remember this decision.', 30, 350)
-			// display nothing
+			if (roundTotal > 0) {
+				text('\n\nLast game score: X/' + roundTotal, 30, 350);
+			}
 			break;
 		case states.PREP:
 			initText();
@@ -115,9 +135,15 @@ function draw() {
 			break;
 		case states.PROCESS:
 			initText();
+			text('Processing audio...', 30, 350)
+			break;
+		case states.DONE:
+			initText();
 			text('Done processing.', 30, 350)
+			text('\nRound score: X/' + numNotes, 30, 350)
+			text('\n\nTotal score: X/' + numNotes*roundTotal, 30, 350)
 			if (timer > 0) {
-				text('\nNext notes will play in '+timer+'...', 30, 350)
+				text('\n\n\n\nNext notes will play in '+timer+'...', 30, 350)
 			}
 			break;
 	}
@@ -175,6 +201,9 @@ function startGame() {
 		}, 1000);
 
 	}, (0.3+now-st)*1000);
+
+	// reset scores
+	roundTotal = 0
 }
 
 function stopGame() {
@@ -259,8 +288,9 @@ function record(length_s, numNotes) {
 	    mediaRecorder.addEventListener("stop", () => {
 	      const audioBlob = new Blob(audioChunks);
 	      const audioUrl = URL.createObjectURL(audioBlob);
-	      const audio = new Audio(audioUrl);
-	      audio.play();
+	      //const audio = new Audio(audioUrl);
+	      //audio.play();
+	      process(audioUrl);
 	    });
 
 			guideInterval = setInterval(() => {
@@ -273,20 +303,23 @@ function record(length_s, numNotes) {
 	  	setTimeout(() => {
 	  		mediaRecorder.stop();
 				noteGuide = 0
-	  		process()
 			}, length_s*1000);
 		})
 		.catch((err) => {
-
+			stopGame();
+			startButton.removeAttribute('disabled');
 		});
-
 }
 
-function process() {
+function process(audioUrl) {
 	state = states.PROCESS;
+	roundTotal += 1
 
-	// temp
-	setTimeout(() => {
+	// transcribe audio
+	transcriber.transcribeFromAudioURL(audioUrl).then((ns) => {
+		console.log(ns);
+
+		state = states.DONE;
 		startButton.removeAttribute('disabled');
 
 		timer = 3
@@ -297,39 +330,5 @@ function process() {
 				clearInterval(timerInterval);
 			}
 		}, 1000);
-	}, 1000);
+	});	
 }
-
-
-// load Onsets and Frames model from Magenta
-// let transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
-// let modelLoaded = transcriber.initialize();
-
-
-let sf = new mm.SoundFontPlayer('https://storage.googleapis.com/magentadata/js/soundfonts/salamander');
-
-audio_file.onchange = function(){
-    var files = this.files;
-    console.log(files[0].constructor.name);
-    var file = URL.createObjectURL(files[0]);
-
-    // container.hidden = true;
-    // transcribe
-		transcriber.transcribeFromAudioURL(file).then((ns) => {
-			console.log(ns);
-
-
-			sf.loadSamples(ns).then(() => {
-				// visualizer = new mm.Visualizer(ns, canvas, {
-	   //        noteRGB: '255, 255, 255', 
-	   //        activeNoteRGB: '232, 69, 164', 
-	   //        pixelsPerTimeStep: window.innerWidth < 500 ? null: 80,
-	   //    });
-
-				// container.hidden = false;
-				audio_player.src = file; 
-				audio_player.play();	
-			});
-
-		});
-};
