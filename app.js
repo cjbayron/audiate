@@ -37,6 +37,7 @@ let modelLoaded;
 let roundTotal;
 
 // DEBUG: data collector
+const DEBUG = false;
 let rows = [];
 
 
@@ -218,14 +219,15 @@ function stopGame() {
 	clearInterval(timerInterval);
 	timer = 0
 
-	// DEBUG
-	if (rows.length > 0) {
-		// save to CSV
-		let csvContent = "data:text/csv;charset=utf-8," 
-    								 + rows.map(e => e.join(",")).join("\n");
-    
-    var encodedUri = encodeURI(csvContent);
-		window.open(encodedUri);
+	if (DEBUG) {
+		if (rows.length > 0) {
+			// save to CSV
+			let csvContent = "data:text/csv;charset=utf-8," 
+	    								 + rows.map(e => e.join(",")).join("\n");
+	    
+	    var encodedUri = encodeURI(csvContent);
+			window.open(encodedUri);
+		}
 	}
 }
 
@@ -246,8 +248,22 @@ function playRandomReference(notes, k) {
 	let refNotes = [];
 	let midiNotes = [];
 	let ix;
+
+	if (DEBUG) {
+		let base = roundTotal % (notes.length - 2);
+	}
 	for (i=0; i<k; i++) {
-		ix = Math.floor(Math.random() * notes.length)
+		if (DEBUG) {
+			if (i < 3) {
+				ix = base + i
+			} else {
+				ix = base + (k-i-1)
+			}
+		}
+		else {
+			ix = Math.floor(Math.random() * notes.length)
+		}
+
 		refNotes.push(notes[ix])
 		midiNotes.push(Tonal.Note.midi(notes[ix]))
 	}
@@ -327,10 +343,11 @@ function process(refNotes, audioUrl) {
 		console.log(ns.notes);
 		console.log(refNotes);
 
-		// DEBUG
-		let row = ["'"+JSON.stringify(ns.notes)+"'", 
-							 "'"+JSON.stringify(refNotes)+"'"]
-		rows.push(row)
+		if (DEBUG) {
+			let row = ["'"+JSON.stringify(ns.notes)+"'", 
+								 "'"+JSON.stringify(refNotes)+"'"]
+			rows.push(row)
+		}
 
 		state = states.DONE;
 		startButton.removeAttribute('disabled');
