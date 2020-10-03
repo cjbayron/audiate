@@ -5,6 +5,7 @@ let font;
 let scaleSelect;
 let startButton;
 let repeatButton;
+let nextButton;
 const titleSize = 50;
 const fontSize = 20;
 const states = {
@@ -17,7 +18,14 @@ const states = {
 	PROCESS: 'process',
 	DONE: 'done'
 }
+// transition modes
+const transModes = {
+	AUTO: 'Automatic',
+	MANUAL: 'Manual'
+}
+
 let state = states.LOADING;
+let transMode = states.AUTO;
 let timer = 0;
 let timerInterval;
 let numNotes = 5;
@@ -58,13 +66,21 @@ function setup() {
 	sigPlayer.volume.value = -12;
 	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
 
-	scaleSelect = createSelect(keys);
-	scaleSelect.position(30, 200)
+	scaleSelect = createSelect();
+	scaleSelect.position(150, 150)
 	keys.forEach((scale) => {
 		scaleSelect.option(scale);
 	});
 	// scaleSelect.style('color', '#261b0a')
 	// scaleSelect.style('background-color', '#e3b196')
+	scaleSelect.attribute('class', 'drop');
+
+	transSelect = createSelect();
+	for (var key in transModes) {
+		transSelect.option(transModes[key]);
+	}
+	transSelect.position(150, 190);
+	transSelect.attribute('class', 'drop');
 
 	startButton = createButton('START')
 	startButton.position(30, 250)
@@ -74,12 +90,17 @@ function setup() {
 	startButton.mouseReleased(startGame);
 	startButton.attribute('disabled', true) // disable until model is loaded
 
-
-	repeatButton = createButton('TEST')
+	repeatButton = createButton('TRY AGAIN')
 	repeatButton.position(200, 250)
 	repeatButton.attribute('class', 'button');
-	//repeatButton.mouseReleased(measure);
+	//repeatButton.mouseReleased();
 	repeatButton.hide();
+
+	nextButton = createButton('NEXT')
+	nextButton.position(370, 250)
+	nextButton.attribute('class', 'button');
+	nextButton.mouseReleased(nextRound);
+	nextButton.hide();
 
 	// trigger microphone permission request
 	navigator.mediaDevices.getUserMedia({ audio: true })
@@ -110,9 +131,13 @@ function draw() {
 		textAlign(LEFT);
 	}
 
+	initText();
+	text('Key:', 30, 180) // dropdown labels
+	text('Transition:', 30, 220) // dropdown labels
+
 	switch(state) {
 		case states.LOADING:
-			initText();
+			// initText();
 			text('Loading piano transcriber model...', 30, 350)
 			break;
 		case states.IDLE:
@@ -169,7 +194,10 @@ function draw() {
 function startGame() {
 
 	startButton.attribute('disabled', true)
-	startButton.html('STOP')
+	startButton.html('END')
+	scaleSelect.attribute('disabled', true)
+	transSelect.attribute('disabled', true)
+
 	state = states.PREP;
 	rows = []; // for DEBUG
 
@@ -177,6 +205,9 @@ function startGame() {
 	if (keyname.length > 1) { // accidentals
 		keyname = keyname.substring(0, 2)
 	}
+
+	transMode = transSelect.value();
+	// console.log(transMode);
 
 	// construct scale
 	let scaleName = keyname.concat(' major')
@@ -227,6 +258,11 @@ function stopGame() {
 	startButton.mouseReleased(startGame);
 	startButton.html('START')
 	state = states.IDLE;
+	
+	repeatButton.hide();
+	nextButton.hide();
+	scaleSelect.removeAttribute('disabled');
+	transSelect.removeAttribute('disabled');
 
 	// reset
 	clearInterval(timerInterval);
@@ -381,14 +417,20 @@ function process(refNotes, audioUrl) {
 		state = states.DONE;
 		startButton.removeAttribute('disabled');
 
-		timer = 3
-		timerInterval = setInterval(() => {
-			timer -= 1
-			if (timer == 0) {
-				state = states.READY;
-				clearInterval(timerInterval);
-			}
-		}, 1000);
+		if (transMode == transModes.AUTO) {
+			timer = 3
+			timerInterval = setInterval(() => {
+				timer -= 1
+				if (timer == 0) {
+					state = states.READY;
+					clearInterval(timerInterval);
+				}
+			}, 1000);
+		} else if (transMode == transModes.MANUAL) {
+			repeatButton.show();
+			nextButton.show();
+		}
+
 	});	
 }
 
@@ -442,6 +484,12 @@ function monophonize(noteSeq, n) {
   }
 
   return monoNotes;
+}
+
+function nextRound() {
+	repeatButton.hide();
+	nextButton.hide();
+	state = states.READY;
 }
 
 // debug
