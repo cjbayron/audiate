@@ -4,6 +4,7 @@ let titlefont;
 let font;
 let scaleSelect;
 let startButton;
+let repeatButton;
 const titleSize = 50;
 const fontSize = 20;
 const states = {
@@ -23,6 +24,7 @@ let numNotes = 5;
 let noteInterval = 0.5
 let noteGuide = 0;
 let guideInterval;
+let clickStart; // debug
 
 // music variables
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
@@ -35,9 +37,11 @@ let modelLoaded;
 
 // score tracker
 let roundTotal;
+let refNotesLatin = ['None'];
+let transNotesLatin = ['None'];
 
 // DEBUG: data collector
-const DEBUG = false;
+const DEBUG = false; //false
 let rows = [];
 
 
@@ -69,6 +73,13 @@ function setup() {
 	startButton.attribute('class', 'button');
 	startButton.mouseReleased(startGame);
 	startButton.attribute('disabled', true) // disable until model is loaded
+
+
+	repeatButton = createButton('TEST')
+	repeatButton.position(200, 250)
+	repeatButton.attribute('class', 'button');
+	//repeatButton.mouseReleased(measure);
+	repeatButton.hide();
 
 	// trigger microphone permission request
 	navigator.mediaDevices.getUserMedia({ audio: true })
@@ -144,10 +155,11 @@ function draw() {
 		case states.DONE:
 			initText();
 			text('Done processing.', 30, 350)
-			text('\nRound score: X/' + numNotes, 30, 350)
-			text('\n\nTotal score: X/' + numNotes*roundTotal, 30, 350)
+			text('\nReference notes: ' + refNotesLatin.toString(), 30, 350)
+			text('\n\nYou played: ' + transNotesLatin.toString(), 30, 350)
+			text('\n\n\nTotal score: X/' + numNotes*roundTotal, 30, 350)
 			if (timer > 0) {
-				text('\n\n\n\nNext notes will play in '+timer+'...', 30, 350)
+				text('\n\n\n\n\nNext notes will play in '+timer+'...', 30, 350)
 			}
 			break;
 	}
@@ -159,6 +171,7 @@ function startGame() {
 	startButton.attribute('disabled', true)
 	startButton.html('STOP')
 	state = states.PREP;
+	rows = []; // for DEBUG
 
 	let keyname = scaleSelect.value();
 	if (keyname.length > 1) { // accidentals
@@ -279,13 +292,14 @@ function playRandomReference(notes, k) {
 
 	// play signal sound
 	let buffer = 0.5
+	clickStart = now + buffer;
 	sigPlayer.start(now+buffer)
 	buffer += 0.8
 	sigPlayer.stop(now+buffer)
 
 	return {
 		midiNotes: midiNotes,
-		playTime: (now - st),
+		playTime: (now - st), // for ref notes only
 		playBuffer: buffer
 	}
 }
@@ -340,8 +354,23 @@ function process(refNotes, audioUrl) {
 
 	// transcribe audio
 	transcriber.transcribeFromAudioURL(audioUrl).then((ns) => {
-		console.log(ns.notes);
-		console.log(refNotes);
+		//console.log(ns.notes);
+		//console.log(refNotes);
+
+		// "convert" transcribed notes to monophonic
+		let transNotes = monophonize(ns.notes, numNotes);
+
+		// convert to Latin notation
+		refNotesLatin = refNotes.map((midiNote) => {
+			return Tonal.Note.pitchClass(Tonal.Note.fromMidi(midiNote))
+		});
+
+		transNotesLatin = transNotes.map((midiNote) => {
+			return Tonal.Note.pitchClass(Tonal.Note.fromMidi(midiNote))
+		});
+		
+		console.log(refNotesLatin);
+		console.log(transNotesLatin);
 
 		if (DEBUG) {
 			let row = ["'"+JSON.stringify(ns.notes)+"'", 
@@ -361,4 +390,61 @@ function process(refNotes, audioUrl) {
 			}
 		}, 1000);
 	});	
+}
+
+function monophonize(noteSeq, n) {
+	// Convert polyphonic symbolic music (NoteSequence class from magenta)
+  // into monophonic (single notes at a time)
+
+  let start = 5.0 // set to max
+  end = 0.0
+  noteSeq.forEach((noteInfo) => {
+  	if (noteInfo['startTime'] < start) {
+  		start = noteInfo['startTime']
+  	}
+
+		if (noteInfo['endTime'] > end) {
+  		end = noteInfo['endTime']
+  	}  	
+  });
+
+  let estInterval = (end - start) / n;
+  let monoNotes = []
+
+  for (i=0; i<n; i++) {
+  	let noteSt = start + i*estInterval;
+  	let noteEd = noteSt + estInterval;
+  	let maxScore = 0;
+  	let monoNote;
+
+  	noteSeq.forEach((noteInfo) => {
+  		if (noteInfo['startTime'] > noteEd
+  			  || noteInfo['startTime'] < noteSt
+  			  || noteInfo['endTime'] < noteSt) {
+  			return; // equivalent to `continue` in the loop
+  		}
+
+  		let trueEd = noteInfo['endTime'];
+  		if (noteInfo['endTime'] >= noteEd) {
+  			trueEd = noteEd;
+  		}
+  		let noteLen = trueEd - noteInfo['startTime'];
+			let noteScore = noteLen * noteInfo['velocity']
+			if (noteScore > maxScore) {
+				maxScore = noteScore
+				monoNote = noteInfo['pitch']
+			}
+  	});
+
+  	if (maxScore > 0) {
+  		monoNotes.push(monoNote);
+  	}
+  }
+
+  return monoNotes;
+}
+
+// debug
+function measure() {
+	console.log(Tone.now() - clickStart);
 }
