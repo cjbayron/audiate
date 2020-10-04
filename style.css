@@ -2,14 +2,12 @@
   display: inline-block;
   margin: 14px;
   padding: 6px 14px;
-  background: 0;
-  border: 0;
   font-family: inherit;
   font-size: inherit;
   text-transform: uppercase;
   cursor: pointer;
-  color: white;
-  background: #e3b196;
+  color: #ffcf8f;
+  background: #a37166;
 	border-radius: 100px;
   width: 150px;
 }
@@ -23,14 +21,11 @@
   /*display: inline-block;*/
   margin: 14px;
   padding: 3px 8px;
-  /*background: 0;*/
-  /*border: 0;*/
   font-family: inherit;
   font-size: inherit;
   /*text-transform: uppercase;*/
   cursor: pointer;
-  color: white;
-  background: #e3b196;
+  color: #ffcf8f;
+  background: #a37166;
   border-radius: 10px;
-  /*width: 50;*/
 }

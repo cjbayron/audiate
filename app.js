@@ -32,6 +32,7 @@ let numNotes = 5;
 let noteInterval = 0.5
 let noteGuide = 0;
 let guideInterval;
+let lastRef; // for repeating rounds
 let clickStart; // debug
 
 // music variables
@@ -44,12 +45,14 @@ let transcriber;
 let modelLoaded;
 
 // score tracker
+let corrects;
+let perfectRounds;
 let roundTotal;
 let refNotesLatin = ['None'];
 let transNotesLatin = ['None'];
 
 // DEBUG: data collector
-const DEBUG = false; //false
+const DEBUG = true; //false
 let rows = [];
 
 
@@ -64,7 +67,8 @@ function setup() {
 	synth = new Tone.PolySynth(Tone.Synth).toDestination();
 	sigPlayer = new Tone.Player('assets/signal.wav').toDestination();
 	sigPlayer.volume.value = -12;
-	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
+	// transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
+	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni_q2');
 
 	scaleSelect = createSelect();
 	scaleSelect.position(150, 150)
@@ -90,14 +94,15 @@ function setup() {
 	startButton.mouseReleased(startGame);
 	startButton.attribute('disabled', true) // disable until model is loaded
 
-	repeatButton = createButton('TRY AGAIN')
-	repeatButton.position(200, 250)
-	repeatButton.attribute('class', 'button');
-	//repeatButton.mouseReleased();
-	repeatButton.hide();
+	// repeatButton = createButton('REPEAT')
+	// repeatButton.position(200, 250)
+	// repeatButton.attribute('class', 'button');
+	// repeatButton.mouseReleased(() => { playRound(repeat=true) });
+	// repeatButton.hide();
 
 	nextButton = createButton('NEXT')
-	nextButton.position(370, 250)
+	// nextButton.position(370, 250);
+	nextButton.position(200, 250);
 	nextButton.attribute('class', 'button');
 	nextButton.mouseReleased(nextRound);
 	nextButton.hide();
@@ -118,14 +123,14 @@ function draw() {
 	let bgColor = '#291f13'; // dark brown
 	background(bgColor);
 
-	fill('#e8a558');
+	fill('#f0c080');
 	textFont(titlefont);
 	textSize(titleSize);
 	textAlign(LEFT)
-	text('Pianotize', 20, 80)
+	text('Pianotize', 30, 80)
 
 	var initText = function() {
-		fill('#e3b196');
+		fill('#f3c1a6');
 		textFont(font);
 		textSize(fontSize);
 		textAlign(LEFT);
@@ -134,22 +139,34 @@ function draw() {
 	initText();
 	text('Key:', 30, 180) // dropdown labels
 	text('Transition:', 30, 220) // dropdown labels
+	
+	let curTransMode = transSelect.value();
+	fill('#e3b196');
+	textFont(font);
+	textSize(fontSize*0.8);
+	textAlign(LEFT);
+	if (curTransMode == transModes.AUTO) {
+		text('Automatically proceed to next round.', 300, 220);
+	} else if (curTransMode == transModes.MANUAL) {
+		// text('User can proceed to next or repeat current round.', 300, 220);
+		text('Manually proceed to next round.', 300, 220);
+	}
 
+	initText();
 	switch(state) {
 		case states.LOADING:
-			// initText();
 			text('Loading piano transcriber model...', 30, 350)
 			break;
 		case states.IDLE:
-			initText();
 			text('To use this app, allow access to microphone.', 30, 350)
 			text('\nFor better experience, set your browser to always remember this decision.', 30, 350)
 			if (roundTotal > 0) {
-				text('\n\nLast game score: X/' + roundTotal, 30, 350);
+				text('\n\nLast game score: ' + perfectRounds + '/' + roundTotal +
+						 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, 350);
 			}
 			break;
 		case states.PREP:
-			initText();
+			// initText();
 			text('Listen carefully to the scale.', 30, 350)
 			if (timer > 0) {
 				text('\nReference notes will play in '+timer+'...', 30, 350)
@@ -159,7 +176,7 @@ function draw() {
 			playRound();
 			break;
 		case states.PLAY:
-			initText();
+			// initText();
 			text('Listen carefully to the reference notes.', 30, 350)
 			text('\nRepeat the notes in your piano after hearing the click sound.', 30, 350)
 			if (timer > 0) {
@@ -167,22 +184,23 @@ function draw() {
 			}
 			break;
 		case states.RECORD:
-			initText();
+			// initText();
 			text('Recording...', 30, 350)
 			if (noteGuide > 0) {
 				text('\n' + '*'.repeat(noteGuide), 30, 350)
 			}
 			break;
 		case states.PROCESS:
-			initText();
+			// initText();
 			text('Processing audio...', 30, 350)
 			break;
 		case states.DONE:
-			initText();
+			// initText();
 			text('Done processing.', 30, 350)
 			text('\nReference notes: ' + refNotesLatin.toString(), 30, 350)
 			text('\n\nYou played: ' + transNotesLatin.toString(), 30, 350)
-			text('\n\n\nTotal score: X/' + numNotes*roundTotal, 30, 350)
+			text('\n\n\nTotal score: ' + perfectRounds + '/' + roundTotal +
+					 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, 350);
 			if (timer > 0) {
 				text('\n\n\n\n\nNext notes will play in '+timer+'...', 30, 350)
 			}
@@ -251,6 +269,8 @@ function startGame() {
 	}, (0.3+now-st)*1000);
 
 	// reset scores
+	corrects = 0
+	perfectRounds = 0
 	roundTotal = 0
 }
 
@@ -259,7 +279,7 @@ function stopGame() {
 	startButton.html('START')
 	state = states.IDLE;
 	
-	repeatButton.hide();
+	// repeatButton.hide();
 	nextButton.hide();
 	scaleSelect.removeAttribute('disabled');
 	transSelect.removeAttribute('disabled');
@@ -280,41 +300,55 @@ function stopGame() {
 	}
 }
 
-function playRound() {
+function playRound(repeat=false) {
 	// play a single round
 	state = states.PLAY;
 	startButton.attribute('disabled', true)
+	// repeatButton.hide();
+	nextButton.hide();
 
-	let ref = playRandomReference(scaleNotes, numNotes);
+	let ref;
+	if (repeat) { // repeat last played
+	 	ref = playReference(lastRef.refNotes, numNotes, sample=false);
+	} else {
+		ref = playReference(scaleNotes, numNotes);
+	}
+	lastRef = ref;
 
 	setTimeout(() => {
 		record(ref, numNotes)
 	}, (ref.playTime + ref.playBuffer)*1000);
 }
 
-function playRandomReference(notes, k) {
+function playReference(notes, k, sample=true) {
 	// pick k notes to play
 	let refNotes = [];
 	let midiNotes = [];
-	let ix;
-
-	if (DEBUG) {
-		let base = roundTotal % (notes.length - 2);
-	}
-	for (i=0; i<k; i++) {
+	if (sample) {
+		let ix;
+		let base;
 		if (DEBUG) {
-			if (i < 3) {
-				ix = base + i
-			} else {
-				ix = base + (k-i-1)
+			base = roundTotal % (scaleNotes.length - 2);
+		}
+		for (i=0; i<k; i++) {
+			if (DEBUG) {
+				if (i < 3) {
+					ix = base + i
+				} else {
+					ix = base + (k-i-1)
+				}
 			}
-		}
-		else {
-			ix = Math.floor(Math.random() * notes.length)
-		}
+			else {
+				ix = Math.floor(Math.random() * notes.length)
+			}
 
-		refNotes.push(notes[ix])
-		midiNotes.push(Tonal.Note.midi(notes[ix]))
+			refNotes.push(notes[ix])
+			midiNotes.push(Tonal.Note.midi(notes[ix]))
+		}
+	} else {
+		refNotes = notes;
+		midiNotes = refNotes.map(Tonal.Note.midi);
+		//console.log(midiNotes);
 	}
 
 	//console.log(refNotes);
@@ -334,6 +368,7 @@ function playRandomReference(notes, k) {
 	sigPlayer.stop(now+buffer)
 
 	return {
+		refNotes: refNotes,
 		midiNotes: midiNotes,
 		playTime: (now - st), // for ref notes only
 		playBuffer: buffer
@@ -405,12 +440,17 @@ function process(refNotes, audioUrl) {
 			return Tonal.Note.pitchClass(Tonal.Note.fromMidi(midiNote))
 		});
 		
+		let res = compare(refNotesLatin, transNotesLatin);
+		corrects += res
+		perfectRounds += (res == numNotes)
+
 		console.log(refNotesLatin);
 		console.log(transNotesLatin);
 
 		if (DEBUG) {
 			let row = ["'"+JSON.stringify(ns.notes)+"'", 
-								 "'"+JSON.stringify(refNotes)+"'"]
+								 "'"+JSON.stringify(refNotes)+"'",
+								 "'"+JSON.stringify(res)+"'"]
 			rows.push(row)
 		}
 
@@ -427,7 +467,7 @@ function process(refNotes, audioUrl) {
 				}
 			}, 1000);
 		} else if (transMode == transModes.MANUAL) {
-			repeatButton.show();
+			// repeatButton.show();
 			nextButton.show();
 		}
 
@@ -486,8 +526,29 @@ function monophonize(noteSeq, n) {
   return monoNotes;
 }
 
+function compare(notesA, notesB) {
+	// if (notesA.length != notesB.length) {
+	// 	return 0;
+	// }
+
+	let compRange = (notesA.length - notesB.length) + 1;
+	let maxMatches = 0;
+	for (let compRound=0; compRound<compRange; compRound++) {
+		let matches = 0;
+		for (let ix=0; ix<notesB.length; ix++) {
+			matches += (notesA[ix+compRound] == notesB[ix])
+		}
+
+		if (matches > maxMatches) {
+			maxMatches = matches;
+		}
+	}
+
+	return maxMatches;
+}
+
 function nextRound() {
-	repeatButton.hide();
+	// repeatButton.hide();
 	nextButton.hide();
 	state = states.READY;
 }
