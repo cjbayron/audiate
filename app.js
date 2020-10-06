@@ -52,7 +52,7 @@ let refNotesLatin = ['None'];
 let transNotesLatin = ['None'];
 
 // DEBUG: data collector
-const DEBUG = true; //false
+const DEBUG = true;
 let rows = [];
 
 
@@ -70,39 +70,44 @@ function setup() {
 	// transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
 	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni_q2');
 
+	let baseY = 150;
 	scaleSelect = createSelect();
-	scaleSelect.position(150, 150)
+	scaleSelect.position(150, baseY); baseY += 40;
 	keys.forEach((scale) => {
 		scaleSelect.option(scale);
 	});
-	// scaleSelect.style('color', '#261b0a')
-	// scaleSelect.style('background-color', '#e3b196')
 	scaleSelect.attribute('class', 'drop');
 
 	transSelect = createSelect();
 	for (var key in transModes) {
 		transSelect.option(transModes[key]);
 	}
-	transSelect.position(150, 190);
+	transSelect.position(150, baseY); baseY += 40;
 	transSelect.attribute('class', 'drop');
 
+	numNoteSelect = createSelect();
+	for (let i=3; i<=7; i++) {
+		numNoteSelect.option(i);
+	}
+	numNoteSelect.selected(5);
+	numNoteSelect.position(150, baseY); baseY += 70;
+	numNoteSelect.attribute('class', 'drop');
+
 	startButton = createButton('START')
-	startButton.position(30, 250)
-	//startButton.style('color', '#261b0a')
-	//startButton.style('background-color', '#e3b196')
+	startButton.position(30, baseY);
 	startButton.attribute('class', 'button');
 	startButton.mouseReleased(startGame);
 	startButton.attribute('disabled', true) // disable until model is loaded
 
 	// repeatButton = createButton('REPEAT')
-	// repeatButton.position(200, 250)
+	// repeatButton.position(200, baseY)
 	// repeatButton.attribute('class', 'button');
 	// repeatButton.mouseReleased(() => { playRound(repeat=true) });
 	// repeatButton.hide();
 
 	nextButton = createButton('NEXT')
-	// nextButton.position(370, 250);
-	nextButton.position(200, 250);
+	// nextButton.position(370, baseY);
+	nextButton.position(200, baseY);
 	nextButton.attribute('class', 'button');
 	nextButton.mouseReleased(nextRound);
 	nextButton.hide();
@@ -127,7 +132,8 @@ function draw() {
 	textFont(titlefont);
 	textSize(titleSize);
 	textAlign(LEFT)
-	text('Pianotize', 30, 80)
+	let baseY = 80;
+	text('Pianotize', 30, baseY); baseY += 100;
 
 	var initText = function() {
 		fill('#f3c1a6');
@@ -137,8 +143,8 @@ function draw() {
 	}
 
 	initText();
-	text('Key:', 30, 180) // dropdown labels
-	text('Transition:', 30, 220) // dropdown labels
+	text('Key:', 30, baseY); baseY += 40; // dropdown labels
+	text('Transition:', 30, baseY) // dropdown labels
 	
 	let curTransMode = transSelect.value();
 	fill('#e3b196');
@@ -146,30 +152,33 @@ function draw() {
 	textSize(fontSize*0.8);
 	textAlign(LEFT);
 	if (curTransMode == transModes.AUTO) {
-		text('Automatically proceed to next round.', 300, 220);
+		text('Automatically proceed to next round.', 300, baseY);
 	} else if (curTransMode == transModes.MANUAL) {
 		// text('User can proceed to next or repeat current round.', 300, 220);
-		text('Manually proceed to next round.', 300, 220);
+		text('Manually proceed to next round.', 300, baseY);
 	}
 
 	initText();
+	baseY += 40;
+	text('Num. notes:', 30, baseY) // dropdown labels
+	baseY = 390;
 	switch(state) {
 		case states.LOADING:
-			text('Loading piano transcriber model...', 30, 350)
+			text('Loading piano transcriber model...', 30, baseY)
 			break;
 		case states.IDLE:
-			text('To use this app, allow access to microphone.', 30, 350)
-			text('\nFor better experience, set your browser to always remember this decision.', 30, 350)
+			text('To use this app, allow access to microphone.', 30, baseY)
+			text('\nFor better experience, set your browser to always remember this decision.', 30, baseY)
 			if (roundTotal > 0) {
 				text('\n\nLast game score: ' + perfectRounds + '/' + roundTotal +
-						 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, 350);
+						 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, baseY);
 			}
 			break;
 		case states.PREP:
 			// initText();
-			text('Listen carefully to the scale.', 30, 350)
+			text('Listen carefully to the scale.', 30, baseY)
 			if (timer > 0) {
-				text('\nReference notes will play in '+timer+'...', 30, 350)
+				text('\nReference notes will play in '+timer+'...', 30, baseY)
 			}
 			break;
 		case states.READY: // state to trigger play
@@ -177,32 +186,32 @@ function draw() {
 			break;
 		case states.PLAY:
 			// initText();
-			text('Listen carefully to the reference notes.', 30, 350)
-			text('\nRepeat the notes in your piano after hearing the click sound.', 30, 350)
+			text('Listen carefully to the reference notes.', 30, baseY)
+			text('\nRepeat the notes in your piano after hearing the click sound.', 30, baseY)
 			if (timer > 0) {
-				text('\n\nNext notes will play in '+timer+'...', 30, 350)
+				text('\n\nNext notes will play in '+timer+'...', 30, baseY)
 			}
 			break;
 		case states.RECORD:
 			// initText();
-			text('Recording...', 30, 350)
+			text('Recording...', 30, baseY)
 			if (noteGuide > 0) {
-				text('\n' + '*'.repeat(noteGuide), 30, 350)
+				text('\n' + '*'.repeat(noteGuide), 30, baseY)
 			}
 			break;
 		case states.PROCESS:
 			// initText();
-			text('Processing audio...', 30, 350)
+			text('Processing audio...', 30, baseY)
 			break;
 		case states.DONE:
 			// initText();
-			text('Done processing.', 30, 350)
-			text('\nReference notes: ' + refNotesLatin.toString(), 30, 350)
-			text('\n\nYou played: ' + transNotesLatin.toString(), 30, 350)
+			text('Done processing.', 30, baseY)
+			text('\nReference notes: ' + refNotesLatin.toString(), 30, baseY)
+			text('\n\nYou played: ' + transNotesLatin.toString(), 30, baseY)
 			text('\n\n\nTotal score: ' + perfectRounds + '/' + roundTotal +
-					 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, 350);
+					 ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, baseY);
 			if (timer > 0) {
-				text('\n\n\n\n\nNext notes will play in '+timer+'...', 30, 350)
+				text('\n\n\n\n\nNext notes will play in '+timer+'...', 30, baseY)
 			}
 			break;
 	}
@@ -215,6 +224,7 @@ function startGame() {
 	startButton.html('END')
 	scaleSelect.attribute('disabled', true)
 	transSelect.attribute('disabled', true)
+	numNoteSelect.attribute('disabled', true)
 
 	state = states.PREP;
 	rows = []; // for DEBUG
@@ -225,6 +235,7 @@ function startGame() {
 	}
 
 	transMode = transSelect.value();
+	numNotes = numNoteSelect.value();
 	// console.log(transMode);
 
 	// construct scale
@@ -283,6 +294,7 @@ function stopGame() {
 	nextButton.hide();
 	scaleSelect.removeAttribute('disabled');
 	transSelect.removeAttribute('disabled');
+	numNoteSelect.removeAttribute('disabled');
 
 	// reset
 	clearInterval(timerInterval);
@@ -328,11 +340,11 @@ function playReference(notes, k, sample=true) {
 		let ix;
 		let base;
 		if (DEBUG) {
-			base = roundTotal % (scaleNotes.length - 2);
+			base = roundTotal % (scaleNotes.length - (Math.round(numNotes/2)-1));
 		}
 		for (i=0; i<k; i++) {
 			if (DEBUG) {
-				if (i < 3) {
+				if (i < Math.round(numNotes/2)) {
 					ix = base + i
 				} else {
 					ix = base + (k-i-1)
