@@ -52,7 +52,7 @@ let refNotesLatin = ['None'];
 let transNotesLatin = ['None'];
 
 // DEBUG: data collector
-const DEBUG = true;
+const DEBUG = false;
 let rows = [];
 
 
@@ -67,8 +67,8 @@ function setup() {
 	synth = new Tone.PolySynth(Tone.Synth).toDestination();
 	sigPlayer = new Tone.Player('assets/signal.wav').toDestination();
 	sigPlayer.volume.value = -12;
-	// transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
-	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni_q2');
+	transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni');
+	// transcriber = new mm.OnsetsAndFrames('https://storage.googleapis.com/magentadata/js/checkpoints/transcription/onsets_frames_uni_q2');
 
 	let baseY = 150;
 	scaleSelect = createSelect();
@@ -490,7 +490,7 @@ function monophonize(noteSeq, n) {
 	// Convert polyphonic symbolic music (NoteSequence class from magenta)
   // into monophonic (single notes at a time)
 
-  let start = 5.0 // set to max
+  let start = 100.0 // set to max
   end = 0.0
   noteSeq.forEach((noteInfo) => {
   	if (noteInfo['startTime'] < start) {
