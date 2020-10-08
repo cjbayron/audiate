@@ -133,6 +133,8 @@ function draw() {
 	textSize(titleSize);
 	textAlign(LEFT)
 	let baseY = 80;
+	strokeWeight(2);
+	stroke(248, 200, 130);
 	text('Pianotize', 30, baseY); baseY += 100;
 
 	var initText = function() {
@@ -140,6 +142,7 @@ function draw() {
 		textFont(font);
 		textSize(fontSize);
 		textAlign(LEFT);
+		noStroke();
 	}
 
 	initText();
@@ -152,10 +155,10 @@ function draw() {
 	textSize(fontSize*0.8);
 	textAlign(LEFT);
 	if (curTransMode == transModes.AUTO) {
-		text('Automatically proceed to next round.', 300, baseY);
+		text('Automatically proceed to next round.', 350, baseY);
 	} else if (curTransMode == transModes.MANUAL) {
 		// text('User can proceed to next or repeat current round.', 300, 220);
-		text('Manually proceed to next round.', 300, baseY);
+		text('Manually proceed to next round.', 350, baseY);
 	}
 
 	initText();

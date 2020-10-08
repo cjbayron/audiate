@@ -28,5 +28,18 @@
   color: #ffcf8f;
   background: #a37166;
   border-radius: 10px;
-  width: 120px;
+  width: 150px;
+}
+
+@font-face { 
+  font-family: 'SourceSansPro';
+  src: url('file:SourceSansPro-SemiboldIt.otf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.title {
+  font-size: 50px;
+  color: #f0c080;
+  font-family: SourceSansPro
 }
