@@ -133,8 +133,8 @@ function draw() {
 	textSize(titleSize);
 	textAlign(LEFT)
 	let baseY = 80;
-	strokeWeight(2);
-	stroke(248, 200, 130);
+	strokeWeight(1);
+	stroke(248, 180, 120);
 	text('Pianotize', 30, baseY); baseY += 100;
 
 	var initText = function() {
