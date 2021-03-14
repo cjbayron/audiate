@@ -1,9 +1,9 @@
 
-// ADD BOILERPLATE for CREPE MODEL here
+// ADD BOILERPLATE for CREPE MODEL here (once working)
+// ADD favicon.ico
 
 /******************************/
 /* UI variables               */
-
 let titlefont;
 let font;
 let scaleSelect;
@@ -44,6 +44,7 @@ let clickStart; // debug
 /******************************/
 /* Music variables            */
 
+let audioContext;
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
               'F#/G♭', 'G', 'G#/A♭', 'A', 'A#/B♭', 'B']
 let scaleNotes;
@@ -60,7 +61,10 @@ let transNotesLatin = ['None'];
 // DEBUG: data collector
 const DEBUG = false;
 let rows = [];
+let curFreq = 'NONE';
+let status = 'STATUS_NONE';
 /******************************/
+
 
 /******************************/
 /* P5 functions               */
@@ -114,13 +118,25 @@ function setup() {
   nextButton.mouseReleased(nextRound);
   nextButton.hide();
 
+
+  try { 
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContext();
+    console.log('Sample rate: ' + audioContext.sampleRate);
+  } catch (e) {
+    status = 'Could not instantiate AudioContext: ' + e.message;
+    throw e;
+  }
+
+  initCREPE();
+
   // trigger microphone permission request
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(() => {
-      state = states.IDLE;
-      startButton.removeAttribute('disabled');
-    })
-    .catch((err) => {});
+  // navigator.mediaDevices.getUserMedia({ audio: true })
+  //   .then(() => {
+  //     state = states.IDLE;
+  //     startButton.removeAttribute('disabled');
+  //   })
+  //   .catch((err) => {});
 }
 
 function windowResized() { // automatically resize window
@@ -152,7 +168,7 @@ function draw() {
   text('Num. notes:', 30, baseY); baseY = 390;
 
   switch(state) {
-    case states.LOADING: text('Loading piano transcriber model...', 30, baseY); break;
+    case states.LOADING: text('Loading pitch transcription model...', 30, baseY); break;
     case states.IDLE:
       text('To use this app, allow access to microphone.', 30, baseY)
       text('\nFor better experience, set your browser to always remember this decision.', 30, baseY)
@@ -194,6 +210,12 @@ function draw() {
       }
       break;
   }
+
+  baseY += 100;
+  text(curFreq, 30, baseY);
+
+  baseY += 50;
+  text(status, 30, baseY);
 }
 
 // p5 draw() helpers
@@ -211,7 +233,9 @@ function initText(useColor='#f3c1a6', useFont=font, useSize=fontSize, isTitle=fa
 }
 /******************************/
 
-// handlers
+
+/******************************/
+/* App processes              */
 function startGame() {
 
   startButton.attribute('disabled', true)
@@ -219,6 +243,7 @@ function startGame() {
   scaleSelect.attribute('disabled', true)
   transSelect.attribute('disabled', true)
   numNoteSelect.attribute('disabled', true)
+  resume(); // audioContext
 
   state = states.PREP;
   rows = []; // for DEBUG
@@ -385,58 +410,89 @@ function record(ref, numNotes) {
   let length_s = ref.playTime + 0.3; // add'l average reflex delay
 
   // record audio
+  // audioContext.resume();
+  guideInterval = setInterval(() => {
+    noteGuide += 1
+    if (noteGuide == numNotes) {
+      clearInterval(guideInterval);
+    }
+  }, noteInterval*1000);
+
+  setTimeout(() => {
+    // audioContext.suspend();
+    state = states.DONE;
+    startButton.removeAttribute('disabled');
+
+    if (transMode == transModes.AUTO) {
+      timer = 3
+      timerInterval = setInterval(() => {
+        timer -= 1
+        if (timer == 0) {
+          clearInterval(timerInterval);
+          playRound();
+        }
+      }, 1000);
+    } else if (transMode == transModes.MANUAL) {
+      // repeatButton.show();
+      nextButton.show();
+    }
+
+    noteGuide = 0
+  }, length_s*1000);
+
+
   // source: https://medium.com/@bryanjenningz/how-to-record-and-play-audio-in-javascript-faa1b2b3e49b
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(stream => {
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.start();
+  // navigator.mediaDevices.getUserMedia({ audio: true })
+  //   .then(stream => {
+  //     const mediaRecorder = new MediaRecorder(stream);
+  //     mediaRecorder.start();
 
-      const audioChunks = [];
-      mediaRecorder.addEventListener("dataavailable", event => {
-        audioChunks.push(event.data);
-      });
+  //     const audioChunks = [];
+  //     mediaRecorder.addEventListener("dataavailable", event => {
+  //       audioChunks.push(event.data);
+  //     });
 
-      mediaRecorder.addEventListener("stop", () => {
-        const audioBlob = new Blob(audioChunks);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        //const audio = new Audio(audioUrl);
-        //audio.play();
-        //process(refNotes, audioUrl);
+  //     mediaRecorder.addEventListener("stop", () => {
+  //       const audioBlob = new Blob(audioChunks);
+  //       const audioUrl = URL.createObjectURL(audioBlob);
+  //       //const audio = new Audio(audioUrl);
+  //       //audio.play();
+  //       //process(refNotes, audioUrl);
 
-        state = states.DONE;
-        startButton.removeAttribute('disabled');
+  //       state = states.DONE;
+  //       startButton.removeAttribute('disabled');
 
-        if (transMode == transModes.AUTO) {
-          timer = 3
-          timerInterval = setInterval(() => {
-            timer -= 1
-            if (timer == 0) {
-              clearInterval(timerInterval);
-              playRound();
-            }
-          }, 1000);
-        } else if (transMode == transModes.MANUAL) {
-          // repeatButton.show();
-          nextButton.show();
-        }
-      });
+  //       if (transMode == transModes.AUTO) {
+  //         timer = 3
+  //         timerInterval = setInterval(() => {
+  //           timer -= 1
+  //           if (timer == 0) {
+  //             clearInterval(timerInterval);
+  //             playRound();
+  //           }
+  //         }, 1000);
+  //       } else if (transMode == transModes.MANUAL) {
+  //         // repeatButton.show();
+  //         nextButton.show();
+  //       }
+  //     });
 
-      guideInterval = setInterval(() => {
-        noteGuide += 1
-        if (noteGuide == numNotes) {
-          clearInterval(guideInterval);
-        }
-      }, noteInterval*1000);
+  //     guideInterval = setInterval(() => {
+  //       noteGuide += 1
+  //       if (noteGuide == numNotes) {
+  //         clearInterval(guideInterval);
+  //       }
+  //     }, noteInterval*1000);
 
-      setTimeout(() => {
-        mediaRecorder.stop();
-        noteGuide = 0
-      }, length_s*1000);
-    })
-    .catch((err) => {
-      stopGame();
-      startButton.removeAttribute('disabled');
-    });
+  //     setTimeout(() => {
+  //       mediaRecorder.stop();
+  //       noteGuide = 0
+  //     }, length_s*1000);
+  //   })
+  //   .catch((err) => {
+  //     stopGame();
+  //     startButton.removeAttribute('disabled');
+  //   });
 }
 
 function process(refNotes, audioUrl) {
@@ -444,7 +500,120 @@ function process(refNotes, audioUrl) {
   roundTotal += 1
 
 }
+/******************************/
 
+
+/******************************/
+/* ML, Audio processing       */
+function resume() {
+  audioContext.resume();
+  status = 'Running ...'
+}
+
+// perform resampling the audio to 16000 Hz, on which the model is trained.
+// setting a sample rate in AudioContext is not supported by most browsers at the moment.
+function resample(audioBuffer, onComplete) {
+  const interpolate = (audioBuffer.sampleRate % 16000 != 0);
+  const multiplier = audioBuffer.sampleRate / 16000;
+  const original = audioBuffer.getChannelData(0);
+  const subsamples = new Float32Array(1024);
+  for (var i = 0; i < 1024; i++) {
+    if (!interpolate) {
+      subsamples[i] = original[i * multiplier];
+    } else {
+      // simplistic, linear resampling
+      var left = Math.floor(i * multiplier);
+      var right = left + 1;
+      var p = i * multiplier - left;
+      subsamples[i] = (1 - p) * original[left] + p * original[right];
+    }
+  }
+  onComplete(subsamples);
+}
+
+function process_microphone_buffer(event) {
+  resample(event.inputBuffer, function(resampled) {
+    tf.tidy(() => {
+      // run the prediction on the model
+      const frame = tf.tensor(resampled.slice(0, 1024));
+      const zeromean = tf.sub(frame, tf.mean(frame));
+      const framestd = tf.tensor(tf.norm(zeromean).dataSync()/Math.sqrt(1024));
+      const normalized = tf.div(zeromean, framestd);
+      const input = normalized.reshape([1, 1024]);
+      const activation = model.predict([input]).reshape([360]);
+
+      // the confidence of voicing activity and the argmax bin
+      const confidence = activation.max().dataSync()[0];
+      status = confidence;
+      // const center = activation.argMax().dataSync()[0];
+      // document.getElementById('voicing-confidence').innerHTML = confidence.toFixed(3);
+    });
+  });
+}
+
+function initAudio() {
+  if (!navigator.getUserMedia) {
+    if (navigator.mediaDevices) {
+      navigator.getUserMedia = navigator.mediaDevices.getUserMedia;
+    } else {
+      navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    }
+  }
+  if (navigator.getUserMedia) {
+    status = 'Initializing audio...';
+    navigator.getUserMedia({audio: true}, function(stream) {
+      status = 'Setting up AudioContext ...';
+      console.log('Audio context sample rate = ' + audioContext.sampleRate);
+      const mic = audioContext.createMediaStreamSource(stream);
+
+      // We need the buffer size that is a power of two and is longer than 1024 samples when resampled to 16000 Hz.
+      // In most platforms where the sample rate is 44.1 kHz or 48 kHz, this will be 4096, giving 10-12 updates/sec.
+      const minBufferSize = audioContext.sampleRate / 16000 * 1024;
+      for (var bufferSize = 4; bufferSize < minBufferSize; bufferSize *= 2);
+      console.log('Buffer size = ' + bufferSize);
+      const scriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
+      scriptNode.onaudioprocess = process_microphone_buffer;
+
+      // It seems necessary to connect the stream to a sink for the pipeline to work, contrary to documentataions.
+      // As a workaround, here we create a gain node with zero gain, and connect temp to the system audio output.
+      const gain = audioContext.createGain();
+      gain.gain.setValueAtTime(0, audioContext.currentTime);
+
+      mic.connect(scriptNode);
+      scriptNode.connect(gain);
+      gain.connect(audioContext.destination);
+
+      status = 'Ready'
+      state = states.IDLE;
+      startButton.removeAttribute('disabled');
+      
+      // if (audioContext.state === 'running') {
+      //   status = 'Running ...';
+      // } else {
+      //   // user gesture (like click) is required to start AudioContext, in some browser versions
+        
+      // }
+    }, function(message) {
+      status = 'Could not access microphone - ' + message;
+    });
+  } else {
+    status = 'Could not access microphone - getUserMedia not available';
+  }
+}
+
+async function initCREPE() {
+  try {
+    status = 'Loading pitch transcription model...';
+    window.model = await tf.loadModel('crepe-model/model.json');
+    status = 'Model loading complete';
+  } catch (e) {
+    throw error(e);
+  }
+  initAudio();
+}
+
+
+// ------------------
 function monophonize(noteSeq, n) {
   // Convert polyphonic symbolic music (NoteSequence class from magenta)
   // into monophonic (single notes at a time)
@@ -528,3 +697,4 @@ function nextRound() {
 function measure() {
   console.log(Tone.now() - clickStart);
 }
+/******************************/
