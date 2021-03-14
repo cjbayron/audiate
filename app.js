@@ -33,7 +33,7 @@ let transMode = transModes.AUTO;
 let timer = 0;
 let timerInterval;
 let numNotes = 5;
-let noteInterval = 0.5
+let noteInterval = 0.5;
 let noteGuide = 0;
 let guideInterval;
 let lastRef; // for repeating rounds
@@ -52,15 +52,17 @@ let synth;
 let sigPlayer;
 
 // score tracker
+let predNotes;
+let predProbs;
+let secondsPerPred;
 let corrects;
 let perfectRounds;
 let roundTotal;
 let refNotesLatin = ['None'];
-let transNotesLatin = ['None'];
+let predNotesLatin = ['None'];
 
 // DEBUG: data collector
-const DEBUG = false;
-let rows = [];
+const DEBUG = true;
 let curFreq = 'NONE';
 let status = 'STATUS_NONE';
 /******************************/
@@ -122,21 +124,12 @@ function setup() {
   try { 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     audioContext = new AudioContext();
-    console.log('Sample rate: ' + audioContext.sampleRate);
   } catch (e) {
     status = 'Could not instantiate AudioContext: ' + e.message;
     throw e;
   }
 
   initCREPE();
-
-  // trigger microphone permission request
-  // navigator.mediaDevices.getUserMedia({ audio: true })
-  //   .then(() => {
-  //     state = states.IDLE;
-  //     startButton.removeAttribute('disabled');
-  //   })
-  //   .catch((err) => {});
 }
 
 function windowResized() { // automatically resize window
@@ -202,7 +195,7 @@ function draw() {
     case states.DONE:
       text('Done processing.', 30, baseY)
       text('\nReference notes: ' + refNotesLatin.toString(), 30, baseY)
-      text('\n\nYou played: ' + transNotesLatin.toString(), 30, baseY)
+      text('\n\nYou played: ' + predNotesLatin.toString(), 30, baseY)
       text('\n\n\nTotal score: ' + perfectRounds + '/' + roundTotal +
            ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, baseY);
       if (timer > 0) {
@@ -246,7 +239,6 @@ function startGame() {
   resume(); // audioContext
 
   state = states.PREP;
-  rows = []; // for DEBUG
 
   let keyname = scaleSelect.value();
   if (keyname.length > 1) keyname = keyname.substring(0, 2); // accidentals
@@ -315,17 +307,6 @@ function stopGame() {
   // reset
   clearInterval(timerInterval);
   timer = 0
-
-  if (DEBUG) {
-    if (rows.length > 0) {
-      // save to CSV
-      let csvContent = "data:text/csv;charset=utf-8," 
-                       + rows.map(e => e.join(",")).join("\n");
-      
-      var encodedUri = encodeURI(csvContent);
-      window.open(encodedUri);
-    }
-  }
 }
 
 function playRound(repeat=false) {
@@ -404,9 +385,12 @@ function playReference(notes, k, sample=true) {
 }
 
 function record(ref, numNotes) {
+  predNotes = []; // reset
+  predProbs = []
+
   state = states.RECORD;
-  // length_s: record length in seconds
   let refNotes = ref.midiNotes;
+  // length_s: record length in seconds
   let length_s = ref.playTime + 0.3; // add'l average reflex delay
 
   // record audio
@@ -420,6 +404,8 @@ function record(ref, numNotes) {
 
   setTimeout(() => {
     // audioContext.suspend();
+    checkRecorded(refNotes)
+
     state = states.DONE;
     startButton.removeAttribute('disabled');
 
@@ -495,10 +481,16 @@ function record(ref, numNotes) {
   //   });
 }
 
-function process(refNotes, audioUrl) {
+function checkRecorded(refNotes) {
   state = states.PROCESS;
   roundTotal += 1
 
+  // pitch tracks
+  // predNotes.length
+  console.log(predNotes);
+  console.log(predProbs);
+  // console.log('Total duration: ' + (predNotes.length * secondsPerPred).toFixed(5));
+  // console.log(predNotes.length + ' ' + predProbs.length);
 }
 /******************************/
 
@@ -533,7 +525,7 @@ function resample(audioBuffer, onComplete) {
 
 // bin number -> cent value mapping
 const cent_mapping = tf.add(tf.linspace(0, 7180, 360), tf.tensor(1997.3794084376191))
-function process_microphone_buffer(event) {
+function transcribe_microphone_buffer(event) {
   resample(event.inputBuffer, function(resampled) {
     tf.tidy(() => {
       /* CREPE model:
@@ -542,7 +534,6 @@ function process_microphone_buffer(event) {
        *     - 20-cent intervals bet. C1 to B7
        *     - fref = 10Hz
        */
-
 
       // run the prediction on the model
       const frame = tf.tensor(resampled.slice(0, 1024));
@@ -554,9 +545,6 @@ function process_microphone_buffer(event) {
 
       // the confidence of voicing activity and the argmax bin
       const confidence = activation.max().dataSync()[0];
-      if (confidence < 0.5)
-        return
-
       const center = activation.argMax().dataSync()[0];
 
       // slice the local neighborhood around the argmax bin
@@ -572,10 +560,13 @@ function process_microphone_buffer(event) {
       const predicted_cent = productSum / weightSum;
       const predicted_hz = 10 * Math.pow(2, predicted_cent / 1200.0);
       const predicted_pitch = Tonal.Note.fromFreq(predicted_hz);
+      const predicted_chroma = predicted_pitch.replace(/[0-9]/, '');
 
       status = predicted_pitch + ', ' + predicted_hz.toFixed(3) + ', ' + confidence.toFixed(3);
-      // const center = activation.argMax().dataSync()[0];
-      // document.getElementById('voicing-confidence').innerHTML = confidence.toFixed(3);
+      if (state == states.RECORD) {
+        predNotes.push(predicted_chroma);
+        predProbs.push(confidence);
+      }
     });
   });
 }
@@ -599,9 +590,11 @@ function initAudio() {
       // In most platforms where the sample rate is 44.1 kHz or 48 kHz, this will be 4096, giving 10-12 updates/sec.
       const minBufferSize = audioContext.sampleRate / 16000 * 1024;
       for (var bufferSize = 4; bufferSize < minBufferSize; bufferSize *= 2);
+      secondsPerPred = (bufferSize / audioContext.sampleRate)
       console.log('Buffer size = ' + bufferSize);
+      console.log('Each prediction is performed over a frame lasting ' + secondsPerPred.toFixed(4) + ' seconds')
       const scriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
-      scriptNode.onaudioprocess = process_microphone_buffer;
+      scriptNode.onaudioprocess = transcribe_microphone_buffer;
 
       // It seems necessary to connect the stream to a sink for the pipeline to work, contrary to documentataions.
       // As a workaround, here we create a gain node with zero gain, and connect temp to the system audio output.
