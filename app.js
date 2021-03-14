@@ -531,9 +531,19 @@ function resample(audioBuffer, onComplete) {
   onComplete(subsamples);
 }
 
+// bin number -> cent value mapping
+const cent_mapping = tf.add(tf.linspace(0, 7180, 360), tf.tensor(1997.3794084376191))
 function process_microphone_buffer(event) {
   resample(event.inputBuffer, function(resampled) {
     tf.tidy(() => {
+      /* CREPE model:
+       *   - run on 1024 samples of 16kHz signal
+       *   - output 360 pitch classes
+       *     - 20-cent intervals bet. C1 to B7
+       *     - fref = 10Hz
+       */
+
+
       // run the prediction on the model
       const frame = tf.tensor(resampled.slice(0, 1024));
       const zeromean = tf.sub(frame, tf.mean(frame));
@@ -544,7 +554,26 @@ function process_microphone_buffer(event) {
 
       // the confidence of voicing activity and the argmax bin
       const confidence = activation.max().dataSync()[0];
-      status = confidence;
+      if (confidence < 0.5)
+        return
+
+      const center = activation.argMax().dataSync()[0];
+
+      // slice the local neighborhood around the argmax bin
+      const start = Math.max(0, center - 4);
+      const end = Math.min(360, center + 5);
+      const weights = activation.slice([start], [end - start]);
+      const cents = cent_mapping.slice([start], [end - start]);
+
+      // take the local weighted average to get the predicted pitch
+      const products = tf.mul(weights, cents);
+      const productSum = products.dataSync().reduce((a, b) => a + b, 0);
+      const weightSum = weights.dataSync().reduce((a, b) => a + b, 0);
+      const predicted_cent = productSum / weightSum;
+      const predicted_hz = 10 * Math.pow(2, predicted_cent / 1200.0);
+      const predicted_pitch = Tonal.Note.fromFreq(predicted_hz);
+
+      status = predicted_pitch + ', ' + predicted_hz.toFixed(3) + ', ' + confidence.toFixed(3);
       // const center = activation.argMax().dataSync()[0];
       // document.getElementById('voicing-confidence').innerHTML = confidence.toFixed(3);
     });
