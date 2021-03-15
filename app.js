@@ -5,6 +5,7 @@
 /******************************/
 /* UI variables               */
 let titlefont;
+let titleImage;
 let font;
 let scaleSelect;
 let startButton;
@@ -55,6 +56,8 @@ let sigPlayer;
 let predNotes;
 let predProbs;
 let secondsPerPred;
+// minimum duration to count a note
+let minNoteDuration = 0.15;
 let corrects;
 let perfectRounds;
 let roundTotal;
@@ -74,6 +77,7 @@ let status = 'STATUS_NONE';
 function preload() {
   titlefont = loadFont('assets/SourceSansPro-SemiboldIt.otf');
   font = loadFont('assets/SourceSansPro-Regular.otf');
+  titleImage = loadImage('assets/audiate.png');
 }
 
 function setup() {
@@ -141,7 +145,8 @@ function draw() {
   initText(useColor='#f0c080', useFont=titlefont, useSize=titleSize, isTitle=true);
   
   let baseY = 80;
-  text('Pianotize', 30, baseY); baseY += 100;
+  //text('audiate', 30, baseY); baseY += 100;
+  image(titleImage, 30, baseY); baseY += 100;
 
   initText();
   // dropdown labels
@@ -394,7 +399,6 @@ function record(ref, numNotes) {
   let length_s = ref.playTime + 0.3; // add'l average reflex delay
 
   // record audio
-  // audioContext.resume();
   guideInterval = setInterval(() => {
     noteGuide += 1
     if (noteGuide == numNotes) {
@@ -403,8 +407,7 @@ function record(ref, numNotes) {
   }, noteInterval*1000);
 
   setTimeout(() => {
-    // audioContext.suspend();
-    checkRecorded(refNotes)
+    checkRecorded(refNotes);
 
     state = states.DONE;
     startButton.removeAttribute('disabled');
@@ -485,10 +488,14 @@ function checkRecorded(refNotes) {
   state = states.PROCESS;
   roundTotal += 1
 
-  // pitch tracks
-  // predNotes.length
   console.log(predNotes);
   console.log(predProbs);
+
+  // number of consecutive predictions of a note
+  // to consider it as actually present
+  const minNumPred = Math.ceil(minNoteDuration / secondsPerPred);
+  let presentNotes = detemporize(predNotes, minNumPred);
+  console.log(presentNotes);
   // console.log('Total duration: ' + (predNotes.length * secondsPerPred).toFixed(5));
   // console.log(predNotes.length + ' ' + predProbs.length);
 }
@@ -545,6 +552,12 @@ function transcribe_microphone_buffer(event) {
 
       // the confidence of voicing activity and the argmax bin
       const confidence = activation.max().dataSync()[0];
+      if ((state == states.RECORD) && (confidence < 0.5)) {
+        predNotes.push('');
+        predProbs.push(0.0);
+        return
+      }
+
       const center = activation.argMax().dataSync()[0];
 
       // slice the local neighborhood around the argmax bin
@@ -633,6 +646,48 @@ async function initCREPE() {
   }
   initAudio();
 }
+
+function detemporize(notes, minConsecutiveCount) {
+  // Assume `notes` is a sequence of notes
+  // with consistent time interval;
+  // what this function does is to just identify
+  // which notes are present (nevermind the duration, hence,
+  // "detemporize") according to a minimum note occurence.
+  let presentNotes = [];
+  let curNote = null;
+  let consecutiveCount = 0;
+  notes.forEach((note) => {
+    if (note == "") { // empty
+      if (consecutiveCount >= minConsecutiveCount) {
+        presentNotes.push(curNote);
+      }
+      curNote = null;
+      consecutiveCount = 0;
+      return
+    }
+
+    if (curNote == null) {
+      curNote = note;
+      consecutiveCount = 1;
+    } else if (note == curNote) {
+      consecutiveCount++;
+    } else if (note != curNote) {
+      if (consecutiveCount >= minConsecutiveCount) {
+        presentNotes.push(curNote);
+      }
+      curNote = note;
+      consecutiveCount = 1;
+    }
+  });
+
+  if (consecutiveCount >= minConsecutiveCount) {
+    presentNotes.push(curNote);
+  }
+
+  return presentNotes;
+}
+
+/******************************/
 
 
 // ------------------
