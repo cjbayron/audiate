@@ -40,7 +40,6 @@ let noteInterval = 0.5;
 let noteGuide = 0;
 let guideInterval;
 let lastRef; // for repeating rounds
-let clickStart; // debug
 /******************************/
 
 
@@ -394,7 +393,6 @@ function playReference(notes, k, sample=true) {
 
   // play signal sound
   let buffer = 0.5
-  clickStart = now + buffer;
   sigPlayer.start(now+buffer)
   buffer += 0.8
   sigPlayer.stop(now+buffer)
