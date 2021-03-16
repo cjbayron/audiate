@@ -34,6 +34,8 @@ let transMode = transModes.AUTO;
 let timer = 0;
 let timerInterval;
 let numNotes = 5;
+const minNumNotes = 3;
+const maxNumNotes = 7;
 let noteInterval = 0.5;
 let noteGuide = 0;
 let guideInterval;
@@ -53,20 +55,19 @@ let synth;
 let sigPlayer;
 
 // score tracker
+let refNotesLatin;
+let playedNotesLatin;
 let predNotes;
 let predProbs;
 let secondsPerPred;
-// minimum duration to count a note
+// minimum duration (seconds) to count a note
 let minNoteDuration = 0.15;
 let corrects;
 let perfectRounds;
 let roundTotal;
-let refNotesLatin = ['None'];
-let predNotesLatin = ['None'];
 
 // DEBUG: data collector
 const DEBUG = true;
-let curFreq = 'NONE';
 let status = 'STATUS_NONE';
 /******************************/
 
@@ -100,8 +101,8 @@ function setup() {
   transSelect.attribute('class', 'drop');
 
   numNoteSelect = createSelect();
-  for (let i=3; i<=7; i++) { numNoteSelect.option(i) } // min notes, max notes
-  numNoteSelect.selected(5); // default notes
+  for (let i=minNumNotes; i<=maxNumNotes; i++) { numNoteSelect.option(i) } // min notes, max notes
+  numNoteSelect.selected(numNotes);
   numNoteSelect.position(150, baseY); baseY += 70;
   numNoteSelect.attribute('class', 'drop');
 
@@ -165,8 +166,10 @@ function draw() {
   initText(); baseY += 40;
   text('Num. notes:', 30, baseY); baseY = 390;
 
+  text('Status: ' + status, 30, baseY); baseY += 40;
   switch(state) {
-    case states.LOADING: text('Loading pitch transcription model...', 30, baseY); break;
+    case states.LOADING: // do nothing (just display status)
+      break;
     case states.IDLE:
       text('To use this app, allow access to microphone.', 30, baseY)
       text('\nFor better experience, set your browser to always remember this decision.', 30, baseY)
@@ -200,7 +203,7 @@ function draw() {
     case states.DONE:
       text('Done processing.', 30, baseY)
       text('\nReference notes: ' + refNotesLatin.toString(), 30, baseY)
-      text('\n\nYou played: ' + predNotesLatin.toString(), 30, baseY)
+      text('\n\nYou played: ' + playedNotesLatin.toString(), 30, baseY)
       text('\n\n\nTotal score: ' + perfectRounds + '/' + roundTotal +
            ' (Per note accuracy: ' + corrects + '/' + (numNotes*roundTotal) + ')', 30, baseY);
       if (timer > 0) {
@@ -208,12 +211,6 @@ function draw() {
       }
       break;
   }
-
-  baseY += 100;
-  text(curFreq, 30, baseY);
-
-  baseY += 50;
-  text(status, 30, baseY);
 }
 
 // p5 draw() helpers
@@ -236,12 +233,27 @@ function initText(useColor='#f3c1a6', useFont=font, useSize=fontSize, isTitle=fa
 /* App processes              */
 function startGame() {
 
+  if (state == states.LOADING) {
+    startButton.attribute('disabled', true)
+    status = 'Finishing things up..'
+    audioContext.resume().then(() => {
+      status = 'READY'
+      state = states.IDLE;
+      startButton.removeAttribute('disabled');
+    })
+    return
+  }
+
+  if (audioContext.state != 'running') {
+    status = 'Problem encountered in browser audio setup. Please refresh the app.'
+    return
+  }
+
   startButton.attribute('disabled', true)
   startButton.html('END')
   scaleSelect.attribute('disabled', true)
   transSelect.attribute('disabled', true)
   numNoteSelect.attribute('disabled', true)
-  resume(); // audioContext
 
   state = states.PREP;
 
@@ -332,6 +344,12 @@ function playRound(repeat=false) {
   setTimeout(() => {
     record(ref, numNotes)
   }, (ref.playTime + ref.playBuffer)*1000);
+}
+
+function nextRound() {
+  // repeatButton.hide();
+  nextButton.hide();
+  playRound();
 }
 
 function playReference(notes, k, sample=true) {
@@ -428,87 +446,34 @@ function record(ref, numNotes) {
 
     noteGuide = 0
   }, length_s*1000);
-
-
-  // source: https://medium.com/@bryanjenningz/how-to-record-and-play-audio-in-javascript-faa1b2b3e49b
-  // navigator.mediaDevices.getUserMedia({ audio: true })
-  //   .then(stream => {
-  //     const mediaRecorder = new MediaRecorder(stream);
-  //     mediaRecorder.start();
-
-  //     const audioChunks = [];
-  //     mediaRecorder.addEventListener("dataavailable", event => {
-  //       audioChunks.push(event.data);
-  //     });
-
-  //     mediaRecorder.addEventListener("stop", () => {
-  //       const audioBlob = new Blob(audioChunks);
-  //       const audioUrl = URL.createObjectURL(audioBlob);
-  //       //const audio = new Audio(audioUrl);
-  //       //audio.play();
-  //       //process(refNotes, audioUrl);
-
-  //       state = states.DONE;
-  //       startButton.removeAttribute('disabled');
-
-  //       if (transMode == transModes.AUTO) {
-  //         timer = 3
-  //         timerInterval = setInterval(() => {
-  //           timer -= 1
-  //           if (timer == 0) {
-  //             clearInterval(timerInterval);
-  //             playRound();
-  //           }
-  //         }, 1000);
-  //       } else if (transMode == transModes.MANUAL) {
-  //         // repeatButton.show();
-  //         nextButton.show();
-  //       }
-  //     });
-
-  //     guideInterval = setInterval(() => {
-  //       noteGuide += 1
-  //       if (noteGuide == numNotes) {
-  //         clearInterval(guideInterval);
-  //       }
-  //     }, noteInterval*1000);
-
-  //     setTimeout(() => {
-  //       mediaRecorder.stop();
-  //       noteGuide = 0
-  //     }, length_s*1000);
-  //   })
-  //   .catch((err) => {
-  //     stopGame();
-  //     startButton.removeAttribute('disabled');
-  //   });
 }
 
 function checkRecorded(refNotes) {
   state = states.PROCESS;
   roundTotal += 1
 
-  console.log(predNotes);
-  console.log(predProbs);
+  // console.log(predNotes);
+  // console.log(predProbs);
 
   // number of consecutive predictions of a note
   // to consider it as actually present
   const minNumPred = Math.ceil(minNoteDuration / secondsPerPred);
-  let presentNotes = detemporize(predNotes, minNumPred);
-  console.log(presentNotes);
-  // console.log('Total duration: ' + (predNotes.length * secondsPerPred).toFixed(5));
-  // console.log(predNotes.length + ' ' + predProbs.length);
+  playedNotesLatin = detemporize(predNotes, minNumPred);
+  // convert to Latin notation
+  refNotesLatin = refNotes.map((midiNote) => {
+    return Tonal.Note.pitchClass(Tonal.Note.fromMidi(midiNote))
+  });
+
+  let res = get_sequence_match_length(refNotesLatin, playedNotesLatin);
+  corrects += res;
+  perfectRounds += (res == numNotes);
+
 }
 /******************************/
 
 
 /******************************/
 /* ML, Audio processing       */
-function resume() {
-  audioContext.resume();
-  status = 'Running ...'
-}
-
 // perform resampling the audio to 16000 Hz, on which the model is trained.
 // setting a sample rate in AudioContext is not supported by most browsers at the moment.
 function resample(audioBuffer, onComplete) {
@@ -575,7 +540,12 @@ function transcribe_microphone_buffer(event) {
       const predicted_pitch = Tonal.Note.fromFreq(predicted_hz);
       const predicted_chroma = predicted_pitch.replace(/[0-9]/, '');
 
-      status = predicted_pitch + ', ' + predicted_hz.toFixed(3) + ', ' + confidence.toFixed(3);
+      if (confidence > 0.5) {
+        status = predicted_pitch + ' (' + predicted_hz.toFixed(3) + ' Hz), Conf: ' + confidence.toFixed(3);
+      } else {
+        status = 'No sound detected (this is not an error).'
+      }
+
       if (state == states.RECORD) {
         predNotes.push(predicted_chroma);
         predProbs.push(confidence);
@@ -618,16 +588,17 @@ function initAudio() {
       scriptNode.connect(gain);
       gain.connect(audioContext.destination);
 
-      status = 'Ready'
-      state = states.IDLE;
+      if (audioContext.state != 'running') {
+        status = 'Your browser needs some user activity to finish setting up. Click START button to finish setup.';
+        state = states.LOADING;
+      }
+      else {
+        status = 'READY';
+        state = states.IDLE;
+      }
+      
       startButton.removeAttribute('disabled');
       
-      // if (audioContext.state === 'running') {
-      //   status = 'Running ...';
-      // } else {
-      //   // user gesture (like click) is required to start AudioContext, in some browser versions
-        
-      // }
     }, function(message) {
       status = 'Could not access microphone - ' + message;
     });
@@ -646,13 +617,16 @@ async function initCREPE() {
   }
   initAudio();
 }
+/******************************/
 
+
+/******************************/
+/* Music/note processing      */
 function detemporize(notes, minConsecutiveCount) {
-  // Assume `notes` is a sequence of notes
-  // with consistent time interval;
-  // what this function does is to just identify
-  // which notes are present (nevermind the duration, hence,
-  // "detemporize") according to a minimum note occurence.
+  // Assume `notes` is a sequence of notes with consistent time interval;
+  // what this function does is to just identify which notes are present
+  // (nevermind the duration, hence, "detemporize")
+  // according to a minimum note occurence
   let presentNotes = [];
   let curNote = null;
   let consecutiveCount = 0;
@@ -687,67 +661,8 @@ function detemporize(notes, minConsecutiveCount) {
   return presentNotes;
 }
 
-/******************************/
-
-
-// ------------------
-function monophonize(noteSeq, n) {
-  // Convert polyphonic symbolic music (NoteSequence class from magenta)
-  // into monophonic (single notes at a time)
-
-  let start = 100.0 // set to max
-  end = 0.0
-  noteSeq.forEach((noteInfo) => {
-    if (noteInfo['startTime'] < start) {
-      start = noteInfo['startTime']
-    }
-
-    if (noteInfo['endTime'] > end) {
-      end = noteInfo['endTime']
-    }   
-  });
-
-  let estInterval = (end - start) / n;
-  let monoNotes = []
-
-  for (i=0; i<n; i++) {
-    let noteSt = start + i*estInterval;
-    let noteEd = noteSt + estInterval;
-    let maxScore = 0;
-    let monoNote;
-
-    noteSeq.forEach((noteInfo) => {
-      if (noteInfo['startTime'] > noteEd
-          || noteInfo['startTime'] < noteSt
-          || noteInfo['endTime'] < noteSt) {
-        return; // equivalent to `continue` in the loop
-      }
-
-      let trueEd = noteInfo['endTime'];
-      if (noteInfo['endTime'] >= noteEd) {
-        trueEd = noteEd;
-      }
-      let noteLen = trueEd - noteInfo['startTime'];
-      let noteScore = noteLen * noteInfo['velocity']
-      if (noteScore > maxScore) {
-        maxScore = noteScore
-        monoNote = noteInfo['pitch']
-      }
-    });
-
-    if (maxScore > 0) {
-      monoNotes.push(monoNote);
-    }
-  }
-
-  return monoNotes;
-}
-
-function compare(notesA, notesB) {
-  // if (notesA.length != notesB.length) {
-  //  return 0;
-  // }
-
+function get_sequence_match_length(notesA, notesB) {
+  // look for the longest sequence match
   let compRange = (notesA.length - notesB.length) + 1;
   let maxMatches = 0;
   for (let compRound=0; compRound<compRange; compRound++) {
@@ -764,14 +679,4 @@ function compare(notesA, notesB) {
   return maxMatches;
 }
 
-function nextRound() {
-  // repeatButton.hide();
-  nextButton.hide();
-  playRound();
-}
-
-// debug
-function measure() {
-  console.log(Tone.now() - clickStart);
-}
 /******************************/
