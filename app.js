@@ -21,7 +21,8 @@ const states = {
   READY: 'ready',
   RECORD: 'record',
   PROCESS: 'process',
-  DONE: 'done'
+  DONE: 'done',
+  ERROR: 'error'
 }
 // transition modes
 const transModes = {
@@ -44,9 +45,14 @@ let lastRef; // for repeating rounds
 
 
 /******************************/
-/* Music variables            */
-
+/* Audio variables            */
 let audioContext;
+let scriptNode;
+/******************************/
+
+
+/******************************/
+/* Music variables            */
 const keys = ['C', 'C#/D♭', 'D', 'D#/E♭', 'E', 'F',
               'F#/G♭', 'G', 'G#/A♭', 'A', 'A#/B♭', 'B']
 let scaleNotes;
@@ -242,8 +248,8 @@ function startGame() {
     return
   }
 
-  if (audioContext.state != 'running') {
-    status = 'Problem encountered in browser audio setup. Please refresh the app.'
+  if ((audioContext.state != 'running') || (state == states.ERROR)) {
+    status = 'Problem encountered in browser audio setup. Please refresh the app or your browser.'
     return
   }
 
@@ -534,6 +540,12 @@ function transcribe_microphone_buffer(event) {
       const weightSum = weights.dataSync().reduce((a, b) => a + b, 0);
       const predicted_cent = productSum / weightSum;
       const predicted_hz = 10 * Math.pow(2, predicted_cent / 1200.0);
+      if (Number.isNaN(predicted_hz)) {
+        state = states.ERROR;
+        scriptNode.onaudioprocess = null;
+        return
+      }
+
       const predicted_pitch = Tonal.Note.fromFreq(predicted_hz);
       const predicted_chroma = predicted_pitch.replace(/[0-9]/, '');
 
@@ -573,7 +585,7 @@ function initAudio() {
       secondsPerPred = (bufferSize / audioContext.sampleRate)
       console.log('Buffer size = ' + bufferSize);
       console.log('Each prediction is performed over a frame lasting ' + secondsPerPred.toFixed(4) + ' seconds')
-      const scriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
+      scriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
       scriptNode.onaudioprocess = transcribe_microphone_buffer;
 
       // It seems necessary to connect the stream to a sink for the pipeline to work, contrary to documentataions.
@@ -604,15 +616,19 @@ function initAudio() {
   }
 }
 
-async function initCREPE() {
+async function initCREPE(model_only=false) {
   try {
     status = 'Loading pitch transcription model...';
-    window.model = await tf.loadModel('crepe-model/model.json');
+    window.model = await tf.loadLayersModel('crepe-model/model.json');
     status = 'Model loading complete';
   } catch (e) {
-    throw error(e);
+    state = states.LOADING;
+    status = e;
+    scriptNode.onaudioprocess = null;
   }
-  initAudio();
+  if (!model_only) {
+    initAudio();
+  }
 }
 /******************************/
 
@@ -660,6 +676,12 @@ function detemporize(notes, minConsecutiveCount) {
 
 function get_sequence_match_length(notesA, notesB) {
   // look for the longest sequence match
+  if (notesB.length > notesA.length) {
+    let temp = notesA;
+    notesA = notesB;
+    notesB = temp;
+  }
+
   let compRange = (notesA.length - notesB.length) + 1;
   let maxMatches = 0;
   for (let compRound=0; compRound<compRange; compRound++) {
