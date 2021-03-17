@@ -65,8 +65,7 @@ let corrects;
 let perfectRounds;
 let roundTotal;
 
-// DEBUG: data collector
-const DEBUG = true;
+const DEBUG = false;
 let status = 'STATUS_NONE';
 /******************************/
 
