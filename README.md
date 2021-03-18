@@ -14,9 +14,16 @@ Audiate, stylized **a**ud**i**ate, is a *play-what-you-hear* type of game wherei
 
 This app runs in your web browser and you can interact with it using the sound of your instrument, fed through your device's microphone. The captured audio is fed to a pitch transcription model running in the browser which transcribes the notes you played, and then checked if matches with the reference notes that the app instructed you to play. Using the transcription model eliminates the need for music interfaces such as MIDI as it can extract the pitch information from plain audio.
 
+Watch [this](https://www.youtube.com/watch?v=VZ3i4V7i7Iw) for a simple demo :)
+
 ### Usage Notes
 
-App has been tested to work well in **Chrome** in **Ubuntu** (16.04), **Windows 10**, and **Android Q** (yes, it can run on phones!). Note also that the pitch transcription model may not transcribe pitch with 100% accuracy, especially on noisy environments.
+App has been tested to work well in **Chrome** in **Ubuntu**. In **some** tests, **Windows 10** and **Android Q** (on phone), too. Note also that the pitch transcription model may not transcribe pitch with 100% accuracy, especially on noisy environments.
+
+You may try the app in the [GitHub pages](https://cjbayron.github.io/audiate/) or on your local machine by cloning this repository and serving the app. For example, via `python`:
+```
+$ python -m http.server 5000
+```
 
 ### Development
 
