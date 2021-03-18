@@ -18,9 +18,9 @@ Watch [this](https://www.youtube.com/watch?v=VZ3i4V7i7Iw) for a simple demo :)
 
 ### Usage Notes
 
-App has been tested to work well in **Chrome** in **Ubuntu**. In **some** tests, **Windows 10** and **Android Q** (on phone), too. Note also that the pitch transcription model may not transcribe pitch with 100% accuracy, especially on noisy environments.
+App has been tested to work well in **Chrome** in **Ubuntu**. In **some** tests, Windows 10 and Android Q (yes, on phone) can work too. Note also that the pitch transcription model may not transcribe pitch with 100% accuracy, especially on noisy environments.
 
-You may try the app in the [GitHub pages](https://cjbayron.github.io/audiate/) or on your local machine by cloning this repository and serving the app. For example, via `python`:
+You may try the app in the [GitHub pages](https://cjbayron.github.io/audiate/) or on your local machine by cloning this repository and serving the app, for example, via `python`:
 ```
 $ python -m http.server 5000
 ```
