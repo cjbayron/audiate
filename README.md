@@ -6,6 +6,10 @@
 
 Ear training game using machine learning (ML/AI) models in the browser
 
+---
+
+#### :trophy: This project is a winning entry to [AIPilipinas](https://aipilipinas.org/) (AI Philippines) TensorFlow Project Showcase 2020-2021!
+
 ## About
 
 Audiate, stylized **a**ud**i**ate, is a *play-what-you-hear* type of game wherein you are tasked to repeat the sequence of notes that the app plays, using the instrument of your choice. It aims to test (& train through practice) one's musical memory and relative pitch.
